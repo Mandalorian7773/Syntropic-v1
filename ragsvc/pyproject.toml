@@ -1,0 +1,29 @@
+[project]
+name = "ragsvc"
+version = "0.1.0"
+description = "Document ingest, hybrid retrieval and artifact generation. Owner: person 2."
+requires-python = ">=3.11"
+dependencies = [
+  "contracts",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "python-multipart>=0.0.12",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Heavy ingest/index deps are deliberately NOT in the base install: `make setup`
+# must finish on a fresh laptop without pulling a torch wheel. Person 2 adds
+# them here (qdrant-client, rapidocr/paddleocr, onnxruntime, rank-bm25,
+# python-docx, openpyxl) and vendors the wheels into the offline cache.
+dev = ["pytest>=8.3"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["ingest", "index", "artifacts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

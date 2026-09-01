@@ -1,0 +1,113 @@
+# Demo stack: single host, no route to the internet.
+#
+# The `internal: true` network below is the whole point. Docker does not attach
+# a gateway to an internal network, so no container on it can reach anything
+# outside -- not by IP, not by DNS. scripts/airgap-check.sh proves it.
+#
+#   make demo    # bring this up
+#   make airgap  # prove it
+#
+# Every image referenced here must already be `docker load`ed on the host.
+# Nothing is pulled at demo time.
+
+name: sih26117
+
+services:
+  llama-server:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    # ^ Pre-pulled at setup time (scripts/package-offline.sh saves it to a tar).
+    #   On the demo host this resolves from the local image store, never the net.
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --model
+      - /models/qwen2.5-vl-7b-instruct-q4_k_m.gguf
+      - --ctx-size
+      - "16384"
+      - --n-gpu-layers
+      - "99"
+      - --flash-attn
+      - --cache-type-k
+      - q8_0
+      - --cache-type-v
+      - q8_0
+    volumes:
+      - ./models:/models:ro
+    networks: [workbench]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - ./qdrant_data:/qdrant/storage
+    networks: [workbench]
+    restart: unless-stopped
+
+  ragsvc:
+    build:
+      context: .
+      dockerfile: ragsvc/Dockerfile
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      WORKSPACE_DIR: /workspace
+      ARTIFACTS_DIR: /artifacts
+      MODELS_DIR: /models
+    volumes:
+      - ./workspace:/workspace
+      - ./artifacts:/artifacts
+      - ./models:/models:ro
+    depends_on: [qdrant]
+    networks: [workbench]
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      MODEL_ENDPOINT: http://llama-server:8080
+      RAG_ENDPOINT: http://ragsvc:8001
+      QDRANT_URL: http://qdrant:6333
+      WORKSPACE_DIR: /workspace
+      ARTIFACTS_DIR: /artifacts
+      MODELS_DIR: /models
+      DB_PATH: /data/workbench.db
+      MAX_STEPS: "10"
+    volumes:
+      - ./workspace:/workspace
+      - ./artifacts:/artifacts
+      - ./models:/models:ro
+      - ./data:/data
+      # The sandbox tool launches sibling containers, so the backend needs the
+      # host docker socket. Person 3: this is a privilege boundary -- document
+      # it in an ADR before the demo, judges will ask.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on: [ragsvc, llama-server]
+    networks: [workbench]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    # Static build served by nginx, which also proxies /api to the backend so
+    # the SPA is same-origin and no CORS config exists to get wrong on stage.
+    ports:
+      - "127.0.0.1:5173:80"   # bound to loopback: the demo host only
+    depends_on: [backend]
+    networks: [workbench]
+    restart: unless-stopped
+
+networks:
+  workbench:
+    driver: bridge
+    internal: true            # <- no gateway, no external route. Do not remove.

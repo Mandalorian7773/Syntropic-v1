@@ -1,0 +1,3 @@
+{"id": "q1", "question": "PLACEHOLDER - replace with a real question over demo/documents/", "expected_doc": "", "expected_page": 0, "notes": "Owner: person 2. Target ~30 questions across the demo corpus."}
+{"id": "q2", "question": "PLACEHOLDER - include at least one exact part-number lookup, which is where BM25 earns its place", "expected_doc": "", "expected_page": 0, "notes": ""}
+{"id": "q3", "question": "PLACEHOLDER - include at least one question answerable only from a scanned page, to exercise OCR", "expected_doc": "", "expected_page": 0, "notes": ""}

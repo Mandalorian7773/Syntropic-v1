@@ -1,0 +1,14 @@
+# Every PR touching these paths needs the listed owner's approval.
+#
+# /contracts/ lists all three on purpose: it is the only shared surface, and a
+# unilateral change to it breaks two people who are not in the room.
+# See contracts/CHANGE-PROTOCOL.md.
+
+/contracts/  @person1 @person2 @person3
+/backend/    @person3
+/ragsvc/     @person2
+/frontend/   @person1
+/sandbox/    @person3
+/config/     @person3
+/bench/      @person3
+/demo/       @person2

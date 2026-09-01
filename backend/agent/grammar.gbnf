@@ -1,0 +1,6 @@
+# GBNF grammar constraining the model to emit well-formed tool calls.
+# Owner: person 3. Placeholder -- llama.cpp loads this via --grammar-file.
+#
+# A 7B model free-forms broken JSON often enough to matter. Constraining the
+# decoder is cheaper than parsing around the damage.
+root ::= "{}"

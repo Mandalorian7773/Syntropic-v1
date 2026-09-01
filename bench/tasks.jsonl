@@ -1,0 +1,5 @@
+{"id": "t1", "task_type": "general", "prompt": "PLACEHOLDER - short factual question, measures cold-start latency", "expect": "", "max_steps": 1}
+{"id": "t2", "task_type": "document", "prompt": "PLACEHOLDER - question requiring retrieval + citation from demo/documents/", "expect": "", "max_steps": 3}
+{"id": "t3", "task_type": "code", "prompt": "PLACEHOLDER - task requiring execute_python, measures model swap cost", "expect": "", "max_steps": 5}
+{"id": "t4", "task_type": "data", "prompt": "PLACEHOLDER - table analysis producing an xlsx artifact", "expect": "", "max_steps": 5}
+{"id": "t5", "task_type": "vision", "prompt": "PLACEHOLDER - question about an attached image", "expect": "", "max_steps": 2}

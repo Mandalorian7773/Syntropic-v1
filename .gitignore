@@ -1,0 +1,34 @@
+# Weights: gigabytes, fetched by scripts/download-models.sh, never committed.
+models/*.gguf
+models/*.onnx
+models/*.bin
+models/*.safetensors
+
+# Runtime state
+workspace/
+artifacts/
+qdrant_data/
+data/
+offline-bundle/
+
+# Secrets and local config
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+build/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# OS
+.DS_Store
+
+# NOTE: bench/results/ is deliberately NOT ignored. Those files are committed
+# evidence that the system got faster. Do not add them here.

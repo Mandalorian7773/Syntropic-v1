@@ -1,0 +1,51 @@
+# ============================================================================
+# Model registry. Owner: person 3. Read by llm/router.py and llm/manager.py.
+#
+# THE POINT OF THIS FILE: adding a model must be an edit here plus a weight
+# file on disk. No code change, no rebuild, no redeploy. If you find yourself
+# editing router.py to teach it about a new model, the registry is wrong --
+# fix the registry instead.
+#
+# Everything is a local path. Nothing in this file may be a URL: the demo
+# machine has no route out, and a config that assumes one fails at the worst
+# possible moment.
+# ============================================================================
+
+defaults:
+  context: 16384
+  n_gpu_layers: 99      # 99 = "all of them"; llama.cpp clamps to what fits
+  flash_attn: true
+  cache_type_k: q8_0    # q8_0 KV cache roughly halves KV VRAM vs f16, which is
+  cache_type_v: q8_0    # the difference between 16k context fitting and not
+
+models:
+  # ---------------------------------------------------------------------------
+  # Vision-capable generalist. Handles documents, images and everything that is
+  # not clearly code. This is the default because a wrong route to the
+  # generalist is a slow answer; a wrong route away from it is a wrong answer.
+  # ---------------------------------------------------------------------------
+  - id: qwen2.5-vl-7b
+    path: models/qwen2.5-vl-7b-instruct-q4_k_m.gguf
+    mmproj: models/qwen2.5-vl-7b-mmproj-f16.gguf   # required for image input
+    capabilities: [general, document, vision, data]
+    context: 16384
+    vram_mb: 5600
+    default: true
+
+  # ---------------------------------------------------------------------------
+  # Coder. Loaded only when the router is confident the task is code, because
+  # swapping models costs ~8 s of visible dead air (see the model.loading event).
+  # ---------------------------------------------------------------------------
+  - id: qwen3-coder-8b
+    path: models/qwen3-coder-8b-q4_k_m.gguf
+    mmproj: null
+    capabilities: [general, code]
+    context: 16384
+    vram_mb: 5100
+    default: false
+
+# Router thresholds. Tune against config/router_trainset.jsonl, not by feel.
+router:
+  min_confidence: 0.60   # below this, stay on the currently loaded model
+  switch_penalty: 0.15   # confidence the challenger must beat the incumbent by,
+                         # because an 8 s reload has to be worth it

@@ -1,0 +1,108 @@
+# Development stack: three laptops on a LAN.
+#
+# Same services as docker-compose.yml, two differences and only two:
+#   1. the network is NOT internal, so containers can reach the LAN
+#   2. ports are published on 0.0.0.0, so teammates can reach this machine
+#
+# This file never runs on the demo host. If you catch yourself reaching for it
+# on demo day, you are about to un-air-gap the demo.
+#
+#   docker compose -f docker-compose.dev.yml up
+
+name: sih26117-dev
+
+services:
+  llama-server:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --model
+      - /models/qwen2.5-vl-7b-instruct-q4_k_m.gguf
+      - --ctx-size
+      - "16384"
+      - --n-gpu-layers
+      - "99"
+      - --flash-attn
+      - --cache-type-k
+      - q8_0
+      - --cache-type-v
+      - q8_0
+    volumes:
+      - ./models:/models:ro
+    ports:
+      - "0.0.0.0:8080:8080"
+    networks: [workbench]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - ./qdrant_data:/qdrant/storage
+    ports:
+      - "0.0.0.0:6333:6333"
+    networks: [workbench]
+
+  ragsvc:
+    build:
+      context: .
+      dockerfile: ragsvc/Dockerfile
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      WORKSPACE_DIR: /workspace
+      ARTIFACTS_DIR: /artifacts
+      MODELS_DIR: /models
+    volumes:
+      - ./workspace:/workspace
+      - ./artifacts:/artifacts
+      - ./models:/models:ro
+      - ./ragsvc:/app/ragsvc          # live reload while developing
+    ports:
+      - "0.0.0.0:8001:8001"
+    depends_on: [qdrant]
+    networks: [workbench]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      MODEL_ENDPOINT: ${MODEL_ENDPOINT:-http://llama-server:8080}
+      RAG_ENDPOINT: ${RAG_ENDPOINT:-http://ragsvc:8001}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      WORKSPACE_DIR: /workspace
+      ARTIFACTS_DIR: /artifacts
+      MODELS_DIR: /models
+      DB_PATH: /data/workbench.db
+      MAX_STEPS: "10"
+    volumes:
+      - ./workspace:/workspace
+      - ./artifacts:/artifacts
+      - ./models:/models:ro
+      - ./data:/data
+      - ./backend:/app/backend        # live reload while developing
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "0.0.0.0:8000:8000"
+    networks: [workbench]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "0.0.0.0:5173:80"
+    networks: [workbench]
+
+networks:
+  workbench:
+    driver: bridge
+    # internal: NOT set here, on purpose. See the header.

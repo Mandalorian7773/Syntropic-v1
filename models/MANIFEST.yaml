@@ -1,0 +1,43 @@
+# ============================================================================
+# Weight manifest. Read by scripts/download-models.sh.
+#
+# !! VERIFY BEFORE THE FIRST DOWNLOAD !!
+# Community GGUF repository names, filenames and quant suffixes change without
+# notice -- repos get renamed, requantised, or reuploaded under a new org. The
+# `repo`, `filename` and `sha256` values below are PLACEHOLDERS. Look each one
+# up on Hugging Face, download once on a connected machine, record the real
+# sha256 with `shasum -a 256`, and commit that. After that first download the
+# project never touches the network again.
+#
+# size_bytes and sha256 are not decoration: download-models.sh refuses to
+# proceed on a mismatch. A silently truncated 5 GB download that llama.cpp
+# half-loads is the kind of bug that eats a whole demo day.
+# ============================================================================
+
+schema_version: 1
+
+models:
+  - id: qwen2.5-vl-7b
+    repo: PLACEHOLDER/Qwen2.5-VL-7B-Instruct-GGUF
+    filename: PLACEHOLDER-qwen2.5-vl-7b-instruct-q4_k_m.gguf
+    quant: Q4_K_M
+    size_bytes: 0
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    role: vision-generalist
+
+  - id: qwen3-coder-8b
+    repo: PLACEHOLDER/Qwen3-Coder-8B-GGUF
+    filename: PLACEHOLDER-qwen3-coder-8b-q4_k_m.gguf
+    quant: Q4_K_M
+    size_bytes: 0
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    role: coder
+
+  # The vision model also needs its multimodal projector. Same rules apply.
+  - id: qwen2.5-vl-7b-mmproj
+    repo: PLACEHOLDER/Qwen2.5-VL-7B-Instruct-GGUF
+    filename: PLACEHOLDER-mmproj-f16.gguf
+    quant: F16
+    size_bytes: 0
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    role: mmproj
