@@ -48,6 +48,21 @@ make test                # 5. pytest + frontend typecheck
 `make help` lists every target. `make mock` runs the standalone SSE server if
 you want to build UI without a backend.
 
+## Driving the demo
+
+The mock server picks a scenario from the message text, so the whole frontend
+can be demonstrated with no backend at all:
+
+| Type this | You get |
+|---|---|
+| …document, SOP, wall loss, report… | vision model, OCR + retrieval with citations, a .docx artifact |
+| …code, python, script, downtime… | a 9.4 s model swap, then a tool that fails once and succeeds on retry |
+| …fail, timeout, error… | a recoverable `TOOL_TIMEOUT` mid-run, then recovery |
+| anything else | plain streamed tokens, no tools |
+
+`python3 frontend/mock/server.py --fast` collapses every delay for automated
+checks. Never judge the UI against it: the real timings are the point.
+
 ## How the pieces fit
 
 ```

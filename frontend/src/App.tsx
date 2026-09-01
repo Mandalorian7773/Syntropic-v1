@@ -40,7 +40,9 @@ export default function App() {
       <aside className="flex w-[22rem] shrink-0 flex-col gap-2 overflow-hidden
                         bg-steel-900/40 p-2">
         <RouterPanel className="shrink-0" />
-        <TracePanel />
+        {/* flex-1: the trace takes the slack so the network monitor
+            is pinned to the bottom edge rather than floating. */}
+        <TracePanel className="flex-1" />
         <ArtifactsPanel className="max-h-64 shrink-0" />
         <NetworkPanel />
       </aside>

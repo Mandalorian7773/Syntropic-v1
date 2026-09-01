@@ -14,7 +14,7 @@ import { useSession } from '../store/session';
 import type { TraceStep } from '../store/session';
 import { Empty, Panel, ms } from '../components/ui';
 
-export default function TracePanel() {
+export default function TracePanel({ className = '' }: { className?: string }) {
   const trace = useSession((s) => s.trace);
   const step = useSession((s) => s.step);
   const maxSteps = useSession((s) => s.maxSteps);
@@ -23,6 +23,7 @@ export default function TracePanel() {
   return (
     <Panel
       title="Agent trace"
+      className={className}
       right={
         maxSteps > 0 ? (
           <span className="font-mono text-tiny tabular-nums text-steel-400">

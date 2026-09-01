@@ -91,8 +91,12 @@ describe('mock scenarios', () => {
     expect(art.filename).toBe('approval-note.docx');
     expect(art.url).toBe(`/api/artifacts/${art.artifact_id}`);
 
-    // Markdown the chat view has to render: a GFM table.
-    expect(text(evs)).toContain('| Location | Nominal |');
+    // Markdown the chat view has to render. The blank lines matter: without
+    // them a heading renders as inline text and a table renders as pipes, so
+    // assert the exact leading newlines, not just the visible characters.
+    const body = text(evs);
+    expect(body).toContain('\n\n## Finding\n\n');
+    expect(body).toContain('\n\n| Location | Nominal | Measured | Loss | Status |\n');
   });
 
   it('code: swaps the model, fails a tool once, then succeeds', async () => {

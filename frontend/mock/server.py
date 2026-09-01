@@ -54,7 +54,11 @@ def hold(seconds: float) -> None:
 
 def tokens(text: str, wpm_ms: tuple[float, float] = (0.030, 0.080)) -> Iterator[dict]:
     """Yield `token` events word by word at a believable decode rate."""
-    parts = re.findall(r"\S+\s*", text)
+    # `\S+\s*` skips LEADING whitespace, which silently eats the "\n\n" in
+    # front of a markdown heading or table and makes it render as inline text.
+    # Emit that leading run as its own chunk.
+    lead = re.match(r"^\s+", text)
+    parts = ([lead.group()] if lead else []) + re.findall(r"\S+\s*", text)
     for part in parts:
         hold(random.uniform(*wpm_ms))
         yield {"type": "token", "text": part}
