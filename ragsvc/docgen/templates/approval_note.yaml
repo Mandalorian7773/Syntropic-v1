@@ -1,0 +1,86 @@
+# Approval note template. Owner: person 2.
+#
+# The layout below is what makes the difference between a generated file and a
+# file a refinery manager will accept. Real approval notes are recognisable
+# before they are read: a reference number in the top left, a date in the top
+# right, a ruled subject line, numbered sections in a fixed order, and a
+# three-column signature block at the foot with designations, not just names.
+#
+# Anything the caller does not supply is still rendered, with its label and an
+# empty rule. An approval note missing its "Reviewed By" column reads as an
+# incomplete form, which is exactly what it is; silently dropping the column
+# would make it read as a finished document that never needed a reviewer.
+
+id: approval_note
+title: Approval Note
+document_type: APPROVAL NOTE
+reference_prefix: APR
+orientation: portrait
+
+# Rendered above the subject, in a two-column borderless grid.
+header_fields:
+  - key: reference
+    label: "Ref. No."
+    auto: reference
+  - key: date
+    label: "Date"
+    auto: date
+  - key: department
+    label: "Department"
+    default: "Inspection and Reliability"
+  - key: originator
+    label: "Originated By"
+    default: ""
+  - key: category
+    label: "Category"
+    default: "Routine"
+  - key: priority
+    label: "Priority"
+    default: "Normal"
+
+subject_label: "Subject"
+
+# Sections are emitted in this order. `required: true` means the heading is
+# printed even when the caller supplies nothing for it, because a missing
+# Recommendation in an approval note is information.
+sections:
+  - key: background
+    heading: "1. Background"
+    required: true
+    hint: "Why this note exists, and what prompted it."
+  - key: observations
+    heading: "2. Observations and Findings"
+    required: true
+    hint: "What was found, with source document and page references."
+  - key: assessment
+    heading: "3. Assessment"
+    required: false
+    hint: "Interpretation of the findings against the applicable standard."
+  - key: recommendation
+    heading: "4. Recommendation"
+    required: true
+    hint: "The specific action being sought, in the imperative."
+  - key: financial_implication
+    heading: "5. Financial Implication"
+    required: false
+  - key: references
+    heading: "6. References"
+    required: false
+    hint: "Source documents, drawing numbers, standards."
+
+signature_block:
+  columns:
+    - role: "Prepared By"
+      lines: ["Name", "Designation", "Date"]
+    - role: "Reviewed By"
+      lines: ["Name", "Designation", "Date"]
+    - role: "Approved By"
+      lines: ["Name", "Designation", "Date"]
+
+distribution:
+  label: "Distribution"
+  default:
+    - "Head - Inspection and Reliability"
+    - "Head - Maintenance"
+    - "Unit Operations Manager"
+    - "File copy"
