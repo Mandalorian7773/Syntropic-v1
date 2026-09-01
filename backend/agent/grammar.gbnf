@@ -1,6 +1,23 @@
-# GBNF grammar constraining the model to emit well-formed tool calls.
-# Owner: person 3. Placeholder -- llama.cpp loads this via --grammar-file.
+# GBNF template constraining the model to well-formed tool-call JSON.
+# Owner: person 3.
 #
-# A 7B model free-forms broken JSON often enough to matter. Constraining the
-# decoder is cheaper than parsing around the damage.
-root ::= "{}"
+# This file is the human-readable reference. At runtime the loop uses
+# agent/grammar.py::build_grammar(), which replaces `toolname` below with the
+# exact alternation of REGISTERED tool names -- so an unregistered tool is not
+# merely rejected by the registry, it is unutterable by the decoder.
+#
+# The only two shapes the model can emit:
+#   {"tool": "<name>", "args": {...}}
+#   {"final": "<answer>"}
+
+root ::= toolcall | final
+final ::= "{" ws "\"final\"" ws ":" ws string ws "}"
+toolcall ::= "{" ws "\"tool\"" ws ":" ws toolname ws "," ws "\"args\"" ws ":" ws object ws "}"
+toolname ::= string
+
+value  ::= object | array | string | number | ("true" | "false" | "null") ws
+object ::= "{" ws ( string ":" ws value ("," ws string ":" ws value)* )? "}" ws
+array  ::= "[" ws ( value ("," ws value)* )? "]" ws
+string ::= "\"" ( [^"\\\x7F\x00-\x1F] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4}) )* "\"" ws
+number ::= ("-"? ([0-9] | [1-9] [0-9]{0,15})) ("." [0-9]+)? ([eE] [-+]? [0-9] [1-9]{0,15})? ws
+ws     ::= | " " | "\n" [ \t]{0,20}

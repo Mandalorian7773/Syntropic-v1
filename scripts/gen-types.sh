@@ -24,12 +24,42 @@ fi
 
 echo "gen-types: exporting JSON Schema from contracts/ ..."
 "$PY" - "$SCHEMA" <<'PYEOF'
-import json, sys
+import inspect, json, sys
 from pydantic import TypeAdapter
 from contracts import events, api
 
 # One schema document with every contract model hung off it, so json2ts emits
 # a single events.ts containing the SSE union AND the REST shapes.
+def require_all(node):
+    """Mark every property required.
+
+    Pydantic omits fields that have defaults from `required`, which makes the
+    generated TypeScript optional (`type?: 'token'`). An optional discriminant
+    is fatal: `switch (ev.type)` no longer narrows the union and the frontend's
+    exhaustiveness check silently stops working.
+
+    But `model_dump_json()` emits every field, defaults included, so the wire
+    ALWAYS carries them. Required is the truthful description of the payload.
+    A nullable field stays nullable (`string | null`) -- that is a different
+    thing from an absent key, and the distinction survives.
+    """
+    if isinstance(node, dict):
+        props = node.get("properties")
+        if isinstance(props, dict) and props:
+            node["required"] = list(props)
+        for key in ("properties", "$defs", "definitions"):
+            for sub in node.get(key, {}).values():
+                require_all(sub)
+        for key in ("items", "additionalProperties"):
+            if isinstance(node.get(key), dict):
+                require_all(node[key])
+        for key in ("anyOf", "oneOf", "allOf"):
+            for sub in node.get(key, []):
+                if isinstance(sub, dict):
+                    require_all(sub)
+    return node
+
+
 def strip_titles(node):
     """Pydantic titles every field; json2ts turns each one into a junk type
     alias (`export type Ts = number`). Drop them below the top level."""
@@ -55,13 +85,27 @@ props: dict = {}
 for mod in (events, api):
     for name in mod.__all__:
         obj = getattr(mod, name)
-        if not (isinstance(obj, type) or name == "Event"):
-            continue  # skip Literal aliases and to_sse
+        # Keep classes, the Event union, AND the Literal aliases (TaskType,
+        # StopReason) -- the frontend switches on those and needs them named.
+        # Skip plain functions like to_sse.
+        # NB: callable() is True for typing special forms (Annotated unions,
+        # Literal aliases), so filter on real functions instead.
+        if inspect.isfunction(obj) or inspect.isbuiltin(obj):
+            continue
         try:
-            schema = TypeAdapter(obj).json_schema(ref_template="#/definitions/{model}")
+            # mode="serialization" is load-bearing. In the default validation
+            # mode every field with a Python default (including the `type`
+            # discriminator, which always has one) comes out OPTIONAL, and an
+            # optional discriminant makes the TypeScript union non-narrowing --
+            # `switch (ev.type)` stops working and exhaustiveness checks fail.
+            # Serialization mode describes what the wire actually carries.
+            schema = TypeAdapter(obj).json_schema(
+                ref_template="#/definitions/{model}", mode="serialization"
+            )
         except Exception:
             continue
         strip_titles(schema)
+        require_all(schema)
         nested = schema.pop("$defs", {})
         for k, v in nested.items():
             v["title"] = k

@@ -1,5 +1,30 @@
-{"id": "t1", "task_type": "general", "prompt": "PLACEHOLDER - short factual question, measures cold-start latency", "expect": "", "max_steps": 1}
-{"id": "t2", "task_type": "document", "prompt": "PLACEHOLDER - question requiring retrieval + citation from demo/documents/", "expect": "", "max_steps": 3}
-{"id": "t3", "task_type": "code", "prompt": "PLACEHOLDER - task requiring execute_python, measures model swap cost", "expect": "", "max_steps": 5}
-{"id": "t4", "task_type": "data", "prompt": "PLACEHOLDER - table analysis producing an xlsx artifact", "expect": "", "max_steps": 5}
-{"id": "t5", "task_type": "vision", "prompt": "PLACEHOLDER - question about an attached image", "expect": "", "max_steps": 2}
+{"id": "gen-01", "task_type": "general", "prompt": "What is the purpose of a flare stack in a refinery? Answer in two sentences.", "expect": "flare", "max_steps": 1}
+{"id": "gen-02", "task_type": "general", "prompt": "Explain in one paragraph why nitrogen purging is done before opening a process vessel.", "expect": "oxygen|inert|nitrogen", "max_steps": 1}
+{"id": "gen-03", "task_type": "general", "prompt": "List three hazards of hydrogen sulfide exposure.", "expect": "h2s|hydrogen sulfide|toxic", "max_steps": 1}
+{"id": "gen-04", "task_type": "general", "prompt": "What is the difference between preventive and predictive maintenance? Two sentences.", "expect": "predict|condition|schedule", "max_steps": 1}
+{"id": "code-01", "task_type": "code", "prompt": "Write a Python function celsius_to_fahrenheit(c) and demonstrate it on 100 C by executing it. Report the output.", "expect": "212", "max_steps": 5}
+{"id": "code-02", "task_type": "code", "prompt": "Write and run Python that computes the sum of squares of integers 1 to 20. Report the number.", "expect": "2870", "max_steps": 5}
+{"id": "code-03", "task_type": "code", "prompt": "Write a file called readings.csv in the workspace with columns tag,value and three rows of sample data, then read it back and confirm its contents.", "expect": "tag|value", "max_steps": 6}
+{"id": "code-04", "task_type": "code", "prompt": "Write and execute Python that finds all prime numbers below 50 and prints them comma separated.", "expect": "47", "max_steps": 5}
+{"id": "code-05", "task_type": "code", "prompt": "Write a Python regex that extracts equipment tags of the form P-101A from the text 'inspect P-101A and E-204B today', run it, and report the matches.", "expect": "P-101A", "max_steps": 5}
+{"id": "code-06", "task_type": "code", "prompt": "Using pandas in the sandbox, create a DataFrame of 5 pump vibration readings, compute the mean, and report it.", "expect": "mean|average", "max_steps": 5}
+{"id": "code-07", "task_type": "code", "prompt": "Write Python that deliberately divides by zero inside a try block, catches the exception, prints 'recovered', and run it.", "expect": "recovered", "max_steps": 5}
+{"id": "code-08", "task_type": "code", "prompt": "Write and run Python that converts 150 psi to kPa (1 psi = 6.89476 kPa) and reports the value rounded to one decimal.", "expect": "1034.2", "max_steps": 5}
+{"id": "data-01", "task_type": "data", "prompt": "Thickness readings in mm by year: 2019: 9.8, 2020: 9.5, 2021: 9.1, 2022: 8.8, 2023: 8.4. Calculate the average annual corrosion rate in mm/yr.", "expect": "0.35", "max_steps": 4}
+{"id": "data-02", "task_type": "data", "prompt": "Monthly downtime hours: Jan 12, Feb 8, Mar 21, Apr 5. What is the total and which month is worst?", "expect": "46", "max_steps": 4}
+{"id": "data-03", "task_type": "data", "prompt": "A tank holds 5000 m3 and is 62 percent full. Daily draw is 155 m3. How many full days of stock remain? Show the calculation.", "expect": "20", "max_steps": 4}
+{"id": "data-04", "task_type": "data", "prompt": "Readings: 101, 99, 104, 250, 98, 102. Identify the outlier and give the mean without it.", "expect": "250", "max_steps": 4}
+{"id": "data-05", "task_type": "data", "prompt": "Planned manhours 1200, actual 1470. What is the overrun percentage, to one decimal?", "expect": "22.5", "max_steps": 4}
+{"id": "data-06", "task_type": "data", "prompt": "Pump A ran 8200 h with 4 failures, pump B 7600 h with 2 failures. Compute MTBF for each and say which is more reliable.", "expect": "3800|B", "max_steps": 4}
+{"id": "data-07", "task_type": "data", "prompt": "Lab sulfur results in ppm: 8, 11, 9, 14, 10, 12. Spec limit is 10 ppm. How many samples exceed spec and what is the median?", "expect": "3", "max_steps": 4}
+{"id": "doc-01", "task_type": "document", "prompt": "Search the indexed documents for the pump startup procedure and summarize its precondition checks with citations.", "expect": "", "max_steps": 5}
+{"id": "doc-02", "task_type": "document", "prompt": "What do the indexed documents say about minimum wall thickness? Cite the source page.", "expect": "", "max_steps": 5}
+{"id": "doc-03", "task_type": "document", "prompt": "Find the confined space entry requirements in the document index and list them as bullets.", "expect": "", "max_steps": 5}
+{"id": "doc-04", "task_type": "document", "prompt": "Summarize the most recent incident report in the index into five bullet points with a citation.", "expect": "", "max_steps": 5}
+{"id": "doc-05", "task_type": "document", "prompt": "Which document mentions hot work permits, and what does it require? Quote the relevant line.", "expect": "", "max_steps": 5}
+{"id": "doc-06", "task_type": "document", "prompt": "Create a one-paragraph brief of the safety procedure most relevant to welding, citing the document and page.", "expect": "", "max_steps": 5}
+{"id": "doc-07", "task_type": "document", "prompt": "List every inspection interval mentioned in the indexed maintenance documents, with citations.", "expect": "", "max_steps": 6}
+{"id": "vis-01", "task_type": "vision", "prompt": "What does the gauge in the attached image read? Give the value and units.", "expect": "", "max_steps": 2, "attachment": "demo/documents/gauge.jpg"}
+{"id": "vis-02", "task_type": "vision", "prompt": "Read the equipment tag from the attached nameplate photo.", "expect": "", "max_steps": 2, "attachment": "demo/documents/nameplate.jpg"}
+{"id": "vis-03", "task_type": "vision", "prompt": "Describe any visible corrosion or damage in the attached photo and rate severity low, medium or high.", "expect": "", "max_steps": 2, "attachment": "demo/documents/pipe.jpg"}
+{"id": "vis-04", "task_type": "vision", "prompt": "From the attached scanned diagram, identify the line number and any valves shown.", "expect": "", "max_steps": 3, "attachment": "demo/documents/pid.png"}

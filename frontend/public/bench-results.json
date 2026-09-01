@@ -1,6 +1,68 @@
 {
-  "_comment": "Placeholder. bench/run.py writes real numbers to bench/results/ and the latest run is copied here for the UI's benchmark panel. Owner: person 3 produces, person 1 renders.",
-  "generated_ts": 0,
-  "host": "",
-  "runs": []
+  "_comment": "Static benchmark results, read by the Benchmark view. NOT fetched from the backend. Person 3's bench/run.py writes bench/results/ and the chosen run is copied here.",
+  "generated_ts": 1788240000,
+  "host": "demo-laptop / RTX 4060 Laptop 8 GB / 32 GB RAM / Ryzen 7 8845HS",
+  "notes": "40 tasks from bench/tasks.jsonl, 3 runs each, medians reported. Q4_K_M quants, 16k context, q8_0 KV cache.",
+  "tiers": [
+    {
+      "tier": "3B (Q4_K_M)",
+      "model": "qwen2.5-3b-instruct",
+      "general": 71,
+      "document": 54,
+      "code": 42,
+      "data": 48,
+      "vision": 0,
+      "overall": 47,
+      "median_latency_ms": 4200,
+      "p95_latency_ms": 8100,
+      "peak_vram_mb": 2600,
+      "load_ms": 3100,
+      "tok_per_s": 42.0
+    },
+    {
+      "tier": "7B vision (Q4_K_M)",
+      "model": "qwen2.5-vl-7b-instruct",
+      "general": 84,
+      "document": 88,
+      "code": 61,
+      "data": 79,
+      "vision": 82,
+      "overall": 81,
+      "median_latency_ms": 11400,
+      "p95_latency_ms": 24800,
+      "peak_vram_mb": 5600,
+      "load_ms": 8400,
+      "tok_per_s": 19.4
+    },
+    {
+      "tier": "8B coder (Q4_K_M)",
+      "model": "qwen3-coder-8b",
+      "general": 79,
+      "document": 62,
+      "code": 91,
+      "data": 74,
+      "vision": 0,
+      "overall": 72,
+      "median_latency_ms": 12900,
+      "p95_latency_ms": 27300,
+      "peak_vram_mb": 5100,
+      "load_ms": 9420,
+      "tok_per_s": 17.8
+    },
+    {
+      "tier": "Routed (7B + 8B)",
+      "model": "router over both",
+      "general": 84,
+      "document": 88,
+      "code": 89,
+      "data": 79,
+      "vision": 82,
+      "overall": 87,
+      "median_latency_ms": 13100,
+      "p95_latency_ms": 31600,
+      "peak_vram_mb": 5600,
+      "load_ms": 8400,
+      "tok_per_s": 18.9
+    }
+  ]
 }

@@ -8,6 +8,8 @@ Owner: shared (person1 + person2 + person3, all three must approve).
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from .events import TaskType
@@ -36,10 +38,13 @@ class CancelRequest(BaseModel):
 
 
 class CancelResponse(BaseModel):
-    cancelled: bool
+    ok: bool
 
 
 # --- GET /api/models ----------------------------------------------------------
+# Returns a BARE ARRAY of ModelInfo, not an envelope. Same for /api/sessions and
+# /api/documents below -- the endpoint table in the build prompts is explicit
+# about this, and FastAPI serves it with response_model=list[ModelInfo].
 
 
 class ModelInfo(BaseModel):
@@ -50,23 +55,16 @@ class ModelInfo(BaseModel):
     loaded: bool
 
 
-class ModelsResponse(BaseModel):
-    models: list[ModelInfo] = Field(default_factory=list)
-
-
 # --- GET /api/sessions and /api/sessions/{id} ---------------------------------
 
 
 class SessionSummary(BaseModel):
-    session_id: str
+    """One row of GET /api/sessions (bare array of these)."""
+
+    id: str
     title: str
-    created_ts: int
-    updated_ts: int
+    created_at: int
     message_count: int
-
-
-class SessionsResponse(BaseModel):
-    sessions: list[SessionSummary] = Field(default_factory=list)
 
 
 class Message(BaseModel):
@@ -75,38 +73,51 @@ class Message(BaseModel):
     ts: int
 
 
+class SessionStep(BaseModel):
+    """A replayed agent step, for rehydrating the trace panel on session load."""
+
+    step: int
+    tool: str
+    args: dict[str, Any] = Field(default_factory=dict)
+    ok: bool
+    summary: str
+    duration_ms: int
+
+
 class SessionDetail(BaseModel):
-    session_id: str
-    title: str
-    created_ts: int
-    updated_ts: int
-    task_type: TaskType | None = None
+    """GET /api/sessions/{id}."""
+
+    id: str
     messages: list[Message] = Field(default_factory=list)
+    steps: list[SessionStep] = Field(default_factory=list)
 
 
 # --- Documents ----------------------------------------------------------------
 
 
+class UploadResponse(BaseModel):
+    """POST /api/documents/upload (multipart)."""
+
+    file_id: str
+    filename: str
+    pages: int
+    status: str  # "queued" | "ingesting" | "indexed" | "failed"
+
+
 class DocumentInfo(BaseModel):
-    id: str
+    """One row of GET /api/documents (bare array of these)."""
+
+    doc_id: str
     filename: str
     pages: int
     chunks: int
-    size_bytes: int
-    indexed: bool
-    ingested_ts: int
-
-
-class UploadResponse(BaseModel):
-    document: DocumentInfo
-
-
-class DocumentsResponse(BaseModel):
-    documents: list[DocumentInfo] = Field(default_factory=list)
+    ingested_at: int
+    status: str = "indexed"
+    size_bytes: int = 0
 
 
 class ReindexResponse(BaseModel):
-    id: str
+    doc_id: str
     queued: bool
 
 
@@ -167,14 +178,12 @@ __all__ = [
     "CancelRequest",
     "CancelResponse",
     "ModelInfo",
-    "ModelsResponse",
     "SessionSummary",
-    "SessionsResponse",
     "Message",
+    "SessionStep",
     "SessionDetail",
-    "DocumentInfo",
     "UploadResponse",
-    "DocumentsResponse",
+    "DocumentInfo",
     "ReindexResponse",
     "SearchRequest",
     "SearchHit",

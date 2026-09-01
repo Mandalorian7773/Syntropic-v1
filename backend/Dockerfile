@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 WORKDIR /app
 COPY contracts/ /app/contracts/
 COPY backend/ /app/backend/
+# config/ rides along so the model registry resolves in-container; compose
+# bind-mounts the live directory over it so a YAML edit needs no rebuild.
+COPY config/ /app/config/
 
 # --no-cache-dir keeps the image small; on the demo host add
 # --no-index --find-links=/wheels to make a network fetch impossible.

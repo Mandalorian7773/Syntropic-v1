@@ -1,49 +1,51 @@
 /**
- * Scaffold page. Owner: person 1.
+ * Layout shell. Owner: person 1.
  *
- * It exists to prove one thing: an SSE stream opened from the browser reaches
- * this component and the frames type-check against the GENERATED contract
- * types. Person 1 replaces this entirely with the real three-panel workbench.
+ * Three regions, all visible at once on a 1920x1080 projector. Nothing that
+ * gets demonstrated is behind a tab or a scroll:
+ *
+ *   rail (56) | chat + composer (flex) | instrument column (fixed 22rem)
+ *
+ * The instrument column is ordered by how often a judge looks at it: router
+ * (demo #1), then the live trace, then artifacts, with the network monitor
+ * pinned to the bottom where it never moves and never scrolls away (demo #5).
  */
 import { useState } from 'react';
-import type { Event } from './types/events';
-import { streamChat } from './api/sse';
+import SessionsRail from './panels/SessionsRail';
+import type { View } from './panels/SessionsRail';
+import RouterPanel from './panels/RouterPanel';
+import TracePanel from './panels/TracePanel';
+import ArtifactsPanel from './panels/ArtifactsPanel';
+import NetworkPanel from './panels/NetworkPanel';
+import ChatView from './views/ChatView';
+import DocumentsView from './views/DocumentsView';
+import BenchmarkView from './views/BenchmarkView';
 
 export default function App() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [streaming, setStreaming] = useState(false);
-
-  async function run() {
-    setEvents([]);
-    setStreaming(true);
-    await streamChat({ message: 'scaffold ping' }, (ev) =>
-      setEvents((prev) => [...prev, ev]),
-    );
-    setStreaming(false);
-  }
+  const [view, setView] = useState<View>('chat');
 
   return (
-    <div className="min-h-screen bg-neutral-950 p-8 font-mono text-sm text-neutral-200">
-      <h1 className="mb-1 text-lg text-neutral-50">SIH26117 workbench — scaffold</h1>
-      <p className="mb-4 text-neutral-500">
-        Stub page. Streams from the mock server and prints raw contract events.
-      </p>
+    <div className="flex h-full w-full overflow-hidden">
+      <SessionsRail view={view} onView={setView} />
 
-      <button
-        onClick={run}
-        disabled={streaming}
-        className="mb-6 rounded border border-neutral-700 px-3 py-1 hover:bg-neutral-800 disabled:opacity-40"
-      >
-        {streaming ? 'streaming…' : 'open stream'}
-      </button>
+      <main className="flex min-w-0 flex-1 flex-col border-r border-steel-800
+                       bg-steel-950/60">
+        {view === 'chat' && <ChatView />}
+        {view === 'documents' && <DocumentsView />}
+        {view === 'benchmark' && <BenchmarkView />}
+      </main>
 
-      <ul className="space-y-1">
-        {events.map((ev, i) => (
-          <li key={i} className="whitespace-pre-wrap break-all text-neutral-400">
-            <span className="text-emerald-400">{ev.type}</span> {JSON.stringify(ev)}
-          </li>
-        ))}
-      </ul>
+      {/* Instrument column. Always mounted, even on the documents and
+          benchmark views: the network monitor must never leave the screen. */}
+      <aside className="flex w-[22rem] shrink-0 flex-col gap-2 overflow-hidden
+                        bg-steel-900/40 p-2">
+        <RouterPanel className="shrink-0" />
+        {/* flex-1: the trace takes the slack so the network monitor
+            is pinned to the bottom edge rather than floating. */}
+        <TracePanel className="flex-1" />
+        <ArtifactsPanel className="max-h-64 shrink-0" />
+        <NetworkPanel />
+      </aside>
     </div>
   );
 }

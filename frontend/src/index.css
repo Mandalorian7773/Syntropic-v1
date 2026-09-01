@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-steel-950 text-steel-200 font-sans antialiased;
+    /* Faint grid, drawn in CSS. An image would be an asset to vendor. */
+    background-image:
+      linear-gradient(rgba(61, 75, 88, 0.16) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(61, 75, 88, 0.16) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  ::selection { @apply bg-accent/30 text-steel-100; }
+}
+
+@layer components {
+  /* Small caps label used on every panel header and field name. */
+  .label {
+    @apply font-mono text-micro uppercase tracking-widest text-steel-500;
+  }
+  .panel {
+    @apply border border-steel-800 bg-steel-900/80 backdrop-blur-[1px];
+  }
+  .panel-head {
+    @apply flex items-center justify-between border-b border-steel-800
+           bg-steel-850 px-3 py-1.5;
+  }
+  /* Thin scrollbars; the default macOS overlay bar disappears on a projector. */
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: #3d4b58 transparent; }
+  .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: #2a3540; border-radius: 4px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover { background: #3d4b58; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* Prism theme, written against the palette above rather than imported, so no
+   stylesheet is fetched and the highlighting matches the rest of the UI. */
+code[class*='language-'], pre[class*='language-'] { @apply text-steel-200; }
+.token.comment, .token.prolog, .token.doctype, .token.cdata { @apply text-steel-500 italic; }
+.token.punctuation { @apply text-steel-400; }
+.token.property, .token.tag, .token.constant, .token.symbol, .token.deleted { @apply text-fault; }
+.token.boolean, .token.number { @apply text-work; }
+.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted { @apply text-iso; }
+.token.operator, .token.entity, .token.url { @apply text-steel-300; }
+.token.atrule, .token.attr-value, .token.keyword { @apply text-accent; }
+.token.function, .token.class-name { @apply text-accent; }
+.token.regex, .token.important, .token.variable { @apply text-work; }

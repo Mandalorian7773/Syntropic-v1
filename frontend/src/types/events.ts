@@ -10,6 +10,8 @@
  * See contracts/CHANGE-PROTOCOL.md.
  * ============================================================ */
 
+export type TaskType = 'general' | 'code' | 'document' | 'vision' | 'data';
+export type StopReason = 'final_answer' | 'max_steps' | 'error' | 'cancelled';
 export type Event =
   | SessionStart
   | RouterDecision
@@ -25,6 +27,8 @@ export type Event =
   | Done;
 
 export interface Contracts {
+  TaskType: TaskType;
+  StopReason: StopReason;
   SessionStart: SessionStart;
   RouterDecision: RouterDecision;
   ModelLoading: ModelLoading;
@@ -44,14 +48,12 @@ export interface Contracts {
   CancelRequest: CancelRequest;
   CancelResponse: CancelResponse;
   ModelInfo: ModelInfo;
-  ModelsResponse: ModelsResponse;
   SessionSummary: SessionSummary;
-  SessionsResponse: SessionsResponse;
   Message: Message;
+  SessionStep: SessionStep;
   SessionDetail: SessionDetail;
-  DocumentInfo: DocumentInfo;
   UploadResponse: UploadResponse;
-  DocumentsResponse: DocumentsResponse;
+  DocumentInfo: DocumentInfo;
   ReindexResponse: ReindexResponse;
   SearchRequest: SearchRequest;
   SearchHit: SearchHit;
@@ -61,57 +63,57 @@ export interface Contracts {
   HealthResponse: HealthResponse;
 }
 export interface SessionStart {
-  type?: 'session.start';
+  type: 'session.start';
   session_id: string;
   ts: number;
 }
 export interface RouterDecision {
-  type?: 'router.decision';
+  type: 'router.decision';
   model_id: string;
   task_type: 'general' | 'code' | 'document' | 'vision' | 'data';
   confidence: number;
   reason: string;
-  alternatives?: string[];
+  alternatives: string[];
 }
 export interface ModelLoading {
-  type?: 'model.loading';
+  type: 'model.loading';
   model_id: string;
-  evicting?: string | null;
+  evicting: string | null;
   eta_s: number;
 }
 export interface ModelReady {
-  type?: 'model.ready';
+  type: 'model.ready';
   model_id: string;
   load_ms: number;
   vram_mb: number;
 }
 export interface AgentStep {
-  type?: 'agent.step';
+  type: 'agent.step';
   step: number;
   max_steps: number;
 }
 export interface Token {
-  type?: 'token';
+  type: 'token';
   text: string;
 }
 export interface ToolCall {
-  type?: 'tool.call';
+  type: 'tool.call';
   call_id: string;
   name: string;
-  args?: {
+  args: {
     [k: string]: unknown;
   };
 }
 export interface ToolResultEvent {
-  type?: 'tool.result';
+  type: 'tool.result';
   call_id: string;
   ok: boolean;
   summary: string;
   duration_ms: number;
-  truncated?: boolean;
+  truncated: boolean;
 }
 export interface Citation {
-  type?: 'citation';
+  type: 'citation';
   doc_id: string;
   filename: string;
   page: number;
@@ -119,7 +121,7 @@ export interface Citation {
   snippet: string;
 }
 export interface Artifact {
-  type?: 'artifact';
+  type: 'artifact';
   artifact_id: string;
   filename: string;
   mime: string;
@@ -127,13 +129,13 @@ export interface Artifact {
   url: string;
 }
 export interface AgentError {
-  type?: 'error';
+  type: 'error';
   code: string;
   message: string;
   recoverable: boolean;
 }
 export interface Done {
-  type?: 'done';
+  type: 'done';
   stop_reason: 'final_answer' | 'max_steps' | 'error' | 'cancelled';
   steps_used: number;
   tokens_in: number;
@@ -165,74 +167,89 @@ export interface Attachment {
   filename: string;
   mime: string;
   size_bytes: number;
-  path?: string | null;
+  path: string | null;
 }
 export interface ChatRequest {
-  session_id?: string | null;
+  session_id: string | null;
   message: string;
-  attachments?: Attachment[];
+  attachments: Attachment[];
 }
 export interface CancelRequest {
   session_id: string;
 }
 export interface CancelResponse {
-  cancelled: boolean;
+  ok: boolean;
 }
 export interface ModelInfo {
   id: string;
-  capabilities?: string[];
+  capabilities: string[];
   context: number;
   vram_mb: number;
   loaded: boolean;
 }
-export interface ModelsResponse {
-  models?: ModelInfo[];
-}
+/**
+ * One row of GET /api/sessions (bare array of these).
+ */
 export interface SessionSummary {
-  session_id: string;
+  id: string;
   title: string;
-  created_ts: number;
-  updated_ts: number;
+  created_at: number;
   message_count: number;
-}
-export interface SessionsResponse {
-  sessions?: SessionSummary[];
 }
 export interface Message {
   role: string;
   content: string;
   ts: number;
 }
-export interface SessionDetail {
-  session_id: string;
-  title: string;
-  created_ts: number;
-  updated_ts: number;
-  task_type?: ('general' | 'code' | 'document' | 'vision' | 'data') | null;
-  messages?: Message[];
+/**
+ * A replayed agent step, for rehydrating the trace panel on session load.
+ */
+export interface SessionStep {
+  step: number;
+  tool: string;
+  args: {
+    [k: string]: unknown;
+  };
+  ok: boolean;
+  summary: string;
+  duration_ms: number;
 }
-export interface DocumentInfo {
+/**
+ * GET /api/sessions/{id}.
+ */
+export interface SessionDetail {
   id: string;
+  messages: Message[];
+  steps: SessionStep[];
+}
+/**
+ * POST /api/documents/upload (multipart).
+ */
+export interface UploadResponse {
+  file_id: string;
+  filename: string;
+  pages: number;
+  status: string;
+}
+/**
+ * One row of GET /api/documents (bare array of these).
+ */
+export interface DocumentInfo {
+  doc_id: string;
   filename: string;
   pages: number;
   chunks: number;
+  ingested_at: number;
+  status: string;
   size_bytes: number;
-  indexed: boolean;
-  ingested_ts: number;
-}
-export interface UploadResponse {
-  document: DocumentInfo;
-}
-export interface DocumentsResponse {
-  documents?: DocumentInfo[];
 }
 export interface ReindexResponse {
-  id: string;
+  doc_id: string;
   queued: boolean;
 }
 export interface SearchRequest {
   query: string;
-  top_k?: number;
+  top_k: number;
 }
 export interface SearchHit {
   doc_id: string;
@@ -242,7 +259,7 @@ export interface SearchHit {
   snippet: string;
 }
 export interface SearchResponse {
-  hits?: SearchHit[];
+  hits: SearchHit[];
 }
 export interface ArtifactInfo {
   artifact_id: string;
@@ -259,7 +276,7 @@ export interface NetworkStatus {
 }
 export interface HealthResponse {
   ok: boolean;
-  model_loaded?: string | null;
+  model_loaded: string | null;
   qdrant: boolean;
   vram_free_mb: number;
 }
