@@ -16,6 +16,7 @@ Startup order matters and is deliberate:
 from __future__ import annotations
 
 import base64
+import json
 import os
 import sys
 import time
@@ -33,12 +34,11 @@ from contracts import (
     ChatRequest,
     HealthResponse,
     ModelInfo,
-    ModelsResponse,
     RouterDecision,
     SessionDetail,
     SessionStart,
+    SessionStep,
     SessionSummary,
-    SessionsResponse,
     Message,
     NetworkStatus,
     to_sse,
@@ -223,7 +223,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 async def chat_cancel(req: CancelRequest) -> CancelResponse:
     hit = cancels.cancel(req.session_id)
     audit.record("chat.cancel", {"found": hit}, req.session_id)
-    return CancelResponse(cancelled=hit)
+    return CancelResponse(ok=hit)
 
 
 @app.post("/api/upload", response_model=Attachment)
@@ -247,27 +247,28 @@ async def upload(file: UploadFile) -> Attachment:
 # --- models / sessions / status -----------------------------------------------
 
 
-@app.get("/api/models", response_model=ModelsResponse)
-async def models() -> ModelsResponse:
-    return ModelsResponse(models=[
+# These three return BARE ARRAYS, not envelopes -- the contract is explicit
+# about it and frontend/src/api/rest.ts consumes them as ModelInfo[] etc.
+@app.get("/api/models", response_model=list[ModelInfo])
+async def models() -> list[ModelInfo]:
+    return [
         ModelInfo(
             id=m.id, capabilities=m.capabilities, context=m.context,
             vram_mb=m.vram_mb, loaded=(m.id == manager.loaded_id),
         )
         for m in manager.registry.models
-    ])
+    ]
 
 
-@app.get("/api/sessions", response_model=SessionsResponse)
-async def sessions() -> SessionsResponse:
-    return SessionsResponse(sessions=[
+@app.get("/api/sessions", response_model=list[SessionSummary])
+async def sessions() -> list[SessionSummary]:
+    return [
         SessionSummary(
-            session_id=s["session_id"], title=s["title"],
-            created_ts=s["created_ts"], updated_ts=s["updated_ts"],
-            message_count=s["message_count"],
+            id=s["session_id"], title=s["title"],
+            created_at=s["created_ts"], message_count=s["message_count"],
         )
         for s in store.list_sessions()
-    ])
+    ]
 
 
 @app.get("/api/sessions/{session_id}", response_model=SessionDetail)
@@ -276,10 +277,20 @@ async def session_detail(session_id: str) -> SessionDetail:
     if s is None:
         raise HTTPException(404, "unknown session")
     return SessionDetail(
-        session_id=s["session_id"], title=s["title"],
-        created_ts=s["created_ts"], updated_ts=s["updated_ts"],
-        task_type=s["task_type"],
+        id=s["session_id"],
         messages=[Message(**m) for m in s["messages"]],
+        # Replayed tool calls so reopening a session rehydrates the trace panel
+        # instead of showing an empty instrument column.
+        steps=[
+            SessionStep(
+                step=row["step"], tool=row["name"],
+                args=json.loads(row["args_json"]),
+                ok=bool(row["ok"]), summary=row["summary"] or "",
+                duration_ms=row["duration_ms"] or 0,
+            )
+            for row in store.get_steps(session_id)
+            if row["ok"] is not None  # skip calls that never returned
+        ],
     )
 
 
@@ -351,7 +362,22 @@ async def _proxy(method: str, path: str, request: Request | None = None) -> Resp
 
 @app.api_route("/api/documents", methods=["GET", "POST"])
 async def documents(request: Request) -> Response:
-    return await _proxy(request.method, "/documents", request)
+    upstream = await _proxy(request.method, "/documents", request)
+    if request.method == "GET" and upstream.status_code == 404:
+        # ragsvc has not built /documents yet. The contract obliges this
+        # endpoint to return list[DocumentInfo], and "nothing is indexed" is
+        # the truthful answer -- so serve that rather than 404 the frontend.
+        # An unreachable ragsvc still raises 502 from _proxy; only a missing
+        # endpoint degrades to empty.
+        return JSONResponse([])
+    return upstream
+
+
+@app.post("/api/documents/upload")
+async def documents_upload(request: Request) -> Response:
+    # Multipart passes straight through to ragsvc; the SPA only ever talks to
+    # this origin (frontend/src/api/rest.ts::uploadDocument).
+    return await _proxy("POST", "/documents/upload", request)
 
 
 @app.api_route("/api/documents/{doc_id}/reindex", methods=["POST"])
