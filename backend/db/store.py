@@ -132,6 +132,18 @@ class Store:
             (artifact_id, session_id, filename, mime, size_bytes, path, _now()),
         )
 
+    def get_steps(self, session_id: str) -> list[dict]:
+        """Completed tool calls in order, for rehydrating the frontend's trace
+        panel (contracts.SessionStep) when a past session is reopened."""
+        return [
+            dict(r)
+            for r in self._read(
+                "SELECT step, name, args_json, ok, summary, duration_ms "
+                "FROM tool_calls WHERE session_id = ? ORDER BY id",
+                (session_id,),
+            )
+        ]
+
     def get_artifact(self, artifact_id: str) -> dict | None:
         rows = self._read("SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,))
         return dict(rows[0]) if rows else None
