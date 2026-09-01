@@ -63,6 +63,27 @@ can be demonstrated with no backend at all:
 `python3 frontend/mock/server.py --fast` collapses every delay for automated
 checks. Never judge the UI against it: the real timings are the point.
 
+## Pointing the frontend at a real backend
+
+The frontend talks to same-origin `/api`; the vite dev server proxies it. One
+env var moves it to another machine — no code change:
+
+```bash
+# P3's laptop hosts the backend
+VITE_API_TARGET=http://192.168.1.10:8000 npm run dev     # from frontend/
+```
+
+Before wiring the UI to it, check the backend actually speaks the contract:
+
+```bash
+.venv/bin/python scripts/check-backend.py http://192.168.1.10:8000
+```
+
+It validates every endpoint's response against the Pydantic models in
+`contracts/`, and streams `/api/chat` to confirm the frames are contract
+events starting with `session.start` and ending with `done`. Exit 0 means the
+frontend can be pointed at it; anything else names the mismatched field.
+
 ## How the pieces fit
 
 ```
