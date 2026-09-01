@@ -83,12 +83,14 @@ services:
       MODELS_DIR: /models
       DB_PATH: /data/workbench.db
       MAX_STEPS: "10"
+      SANDBOX_HOST_WORKSPACE: ${PWD}/workspace
     volumes:
       - ./workspace:/workspace
       - ./artifacts:/artifacts
       - ./models:/models:ro
       - ./data:/data
       - ./backend:/app/backend        # live reload while developing
+      - ./config:/app/config:ro
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "0.0.0.0:8000:8000"

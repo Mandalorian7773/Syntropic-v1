@@ -1,5 +1,200 @@
-{"text": "PLACEHOLDER - rewrite this SOP section as a bulleted checklist", "task_type": "document"}
-{"text": "PLACEHOLDER - write a python script that parses this csv and plots the trend", "task_type": "code"}
-{"text": "PLACEHOLDER - what does this pressure gauge in the photo read", "task_type": "vision"}
-{"text": "PLACEHOLDER - summarise the wall-loss figures in this table by month", "task_type": "data"}
-{"text": "PLACEHOLDER - who signs off on a hot work permit", "task_type": "general"}
+{"text": "who is responsible for approving a hot work permit in the crude unit", "task_type": "general"}
+{"text": "explain the difference between a shutdown and a turnaround", "task_type": "general"}
+{"text": "what ppe is required when entering a confined space", "task_type": "general"}
+{"text": "how often should pressure relief valves be tested", "task_type": "general"}
+{"text": "what does mrpl stand for", "task_type": "general"}
+{"text": "explain cathodic protection in simple terms", "task_type": "general"}
+{"text": "what is the flash point of diesel", "task_type": "general"}
+{"text": "why do we use nitrogen purging before opening a vessel", "task_type": "general"}
+{"text": "what are the steps in a management of change process", "task_type": "general"}
+{"text": "when is a lockout tagout required", "task_type": "general"}
+{"text": "explain what a p&id is to a new trainee", "task_type": "general"}
+{"text": "what is the difference between api 570 and api 653 inspections", "task_type": "general"}
+{"text": "who should be notified first when a flange leak is spotted", "task_type": "general"}
+{"text": "give me a short briefing on h2s hazards for tomorrow's toolbox talk", "task_type": "general"}
+{"text": "what is the purpose of a flare stack", "task_type": "general"}
+{"text": "explain the role of a desalter in crude processing", "task_type": "general"}
+{"text": "what qualifications does a certified welder need for pipeline work", "task_type": "general"}
+{"text": "how does a centrifugal pump differ from a positive displacement pump", "task_type": "general"}
+{"text": "what is the standard notice period for a vendor contract termination", "task_type": "general"}
+{"text": "describe the emergency evacuation procedure for the tank farm", "task_type": "general"}
+{"text": "what is corrosion under insulation and why is it dangerous", "task_type": "general"}
+{"text": "when should we escalate a near-miss to a full incident investigation", "task_type": "general"}
+{"text": "explain the difference between sweet and sour crude", "task_type": "general"}
+{"text": "what does the term battery limit mean in a refinery", "task_type": "general"}
+{"text": "how long can a temporary repair clamp stay in service", "task_type": "general"}
+{"text": "what is the minimum crew size for a confined space entry", "task_type": "general"}
+{"text": "why is static grounding required when loading tankers", "task_type": "general"}
+{"text": "give a quick overview of our permit to work system", "task_type": "general"}
+{"text": "what is the difference between preventive and predictive maintenance", "task_type": "general"}
+{"text": "explain what a hazop study covers", "task_type": "general"}
+{"text": "what training is mandatory before working at height", "task_type": "general"}
+{"text": "who owns the master isolation register during a turnaround", "task_type": "general"}
+{"text": "what is the purpose of a knock-out drum upstream of the flare", "task_type": "general"}
+{"text": "how do i raise a purchase requisition for spare gaskets", "task_type": "general"}
+{"text": "what are the acceptable noise exposure limits per shift", "task_type": "general"}
+{"text": "explain the difference between class 150 and class 300 flanges", "task_type": "general"}
+{"text": "when does a scaffold need a green tag versus a yellow tag", "task_type": "general"}
+{"text": "what should the panel operator do if the fired heater trips", "task_type": "general"}
+{"text": "summarize the key duties of a fire watch during welding", "task_type": "general"}
+{"text": "what is the shelf life of self contained breathing apparatus cylinders", "task_type": "general"}
+{"text": "write a python script that parses this csv of tank levels and plots the trend", "task_type": "code"}
+{"text": "fix this python function that crashes with a keyerror when the column is missing", "task_type": "code"}
+{"text": "write a script to rename all files in a folder to lowercase with underscores", "task_type": "code"}
+{"text": "convert this bash loop into a python equivalent", "task_type": "code"}
+{"text": "write a regex that extracts equipment tags like p-101a from free text", "task_type": "code"}
+{"text": "debug this pandas groupby that returns an empty dataframe", "task_type": "code"}
+{"text": "write a function that converts pressure from psi to kpa with input validation", "task_type": "code"}
+{"text": "generate a python class to represent a work permit with validation rules", "task_type": "code"}
+{"text": "why does this matplotlib script produce a blank figure when saved", "task_type": "code"}
+{"text": "write unit tests for this temperature conversion module", "task_type": "code"}
+{"text": "optimize this nested loop that matches 10000 inspection records", "task_type": "code"}
+{"text": "write a sql query to find all overdue maintenance work orders", "task_type": "code"}
+{"text": "create a python script that watches a folder and logs new files", "task_type": "code"}
+{"text": "refactor this 200 line function into smaller testable pieces", "task_type": "code"}
+{"text": "write code to merge two excel sheets on equipment id using openpyxl", "task_type": "code"}
+{"text": "this script throws unicodedecodeerror reading the log file, fix it", "task_type": "code"}
+{"text": "write a python generator that yields batches of 500 rows from a large csv", "task_type": "code"}
+{"text": "implement binary search over a sorted list of timestamps", "task_type": "code"}
+{"text": "write a script to validate that every row has exactly 12 columns", "task_type": "code"}
+{"text": "why is my recursive function hitting maximum recursion depth here", "task_type": "code"}
+{"text": "write a python cli tool that takes a date range and prints shift schedules", "task_type": "code"}
+{"text": "convert this json config into a typed dataclass", "task_type": "code"}
+{"text": "write a decorator that retries a function three times with backoff", "task_type": "code"}
+{"text": "parse this fixed-width text file from the historian into a dataframe", "task_type": "code"}
+{"text": "the script hangs on file lock when two users run it, add safe locking", "task_type": "code"}
+{"text": "write a function that flags readings outside three standard deviations", "task_type": "code"}
+{"text": "build a simple flask endpoint that returns pump status as json", "task_type": "code"}
+{"text": "fix the off by one error in this loop over inspection intervals", "task_type": "code"}
+{"text": "write a script that zips yesterday's log files and moves them to archive", "task_type": "code"}
+{"text": "how do i memoize this expensive parsing function in python", "task_type": "code"}
+{"text": "write code to detect duplicate equipment tags across two csv exports", "task_type": "code"}
+{"text": "create a python script to split a large pdf into one file per page", "task_type": "code"}
+{"text": "implement a moving average filter over a list of sensor readings", "task_type": "code"}
+{"text": "why does this datetime comparison fail across timezone boundaries", "task_type": "code"}
+{"text": "write a script that emails nothing but writes an alert file when disk is 90 percent full", "task_type": "code"}
+{"text": "turn this repeated copy paste block into a reusable function", "task_type": "code"}
+{"text": "write a python script to diff two requirement text files", "task_type": "code"}
+{"text": "add type hints and docstrings to this utility module", "task_type": "code"}
+{"text": "write a parser for iso 8601 durations like pt2h30m", "task_type": "code"}
+{"text": "profile this script and tell me which function eats the most time", "task_type": "code"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document"}
+{"text": "rewrite this sop section as a numbered checklist for field operators", "task_type": "document"}
+{"text": "what does our inspection manual say about minimum wall thickness for this line", "task_type": "document"}
+{"text": "find the clause in the vendor contract about late delivery penalties", "task_type": "document"}
+{"text": "compare revision 3 and revision 4 of the confined space procedure", "task_type": "document"}
+{"text": "extract all action items from the last turnaround review report", "task_type": "document"}
+{"text": "which document defines the acceptance criteria for weld repairs", "task_type": "document"}
+{"text": "summarize the incident investigation report into five bullet points", "task_type": "document"}
+{"text": "what does sop-014 say about restarting the compressor after a trip", "task_type": "document"}
+{"text": "list every reference to api 510 in our inspection procedures", "task_type": "document"}
+{"text": "draft a one page brief from this 40 page hazop report", "task_type": "document"}
+{"text": "search the maintenance manuals for the torque spec of the exchanger flange bolts", "task_type": "document"}
+{"text": "what is the retention period for permits according to the records policy", "task_type": "document"}
+{"text": "pull the emergency contact matrix out of the crisis management plan", "task_type": "document"}
+{"text": "which sections of the safety case mention the new isomerisation unit", "task_type": "document"}
+{"text": "summarize what the corrosion management strategy says about dead legs", "task_type": "document"}
+{"text": "find the paragraph in the lease agreement covering equipment ownership", "task_type": "document"}
+{"text": "rewrite this technical bulletin so a non-engineer can follow it", "task_type": "document"}
+{"text": "extract the inspection intervals table from the mechanical integrity manual", "task_type": "document"}
+{"text": "what changed in the latest revision of the hot tapping procedure", "task_type": "document"}
+{"text": "give me the definitions section from the management of change policy", "task_type": "document"}
+{"text": "summarize the vendor's proposal and flag anything unusual in the warranty terms", "task_type": "document"}
+{"text": "which procedure covers simultaneous operations during tanker unloading", "task_type": "document"}
+{"text": "condense these three shift handover reports into one summary", "task_type": "document"}
+{"text": "find where the quality manual defines hold points for fabrication", "task_type": "document"}
+{"text": "list the preconditions in the startup procedure before introducing feed", "task_type": "document"}
+{"text": "what does the environmental permit say about flaring limits", "task_type": "document"}
+{"text": "turn the minutes of the safety committee meeting into an action tracker", "task_type": "document"}
+{"text": "quote the exact wording of the force majeure clause in this agreement", "task_type": "document"}
+{"text": "summarize the audit findings related to permit to work compliance", "task_type": "document"}
+{"text": "which annexure of the tender document lists the payment milestones", "task_type": "document"}
+{"text": "extract every deadline mentioned in this project execution plan", "task_type": "document"}
+{"text": "what does the piping spec say about gasket material for sour service", "task_type": "document"}
+{"text": "shorten this 12 paragraph memo into three paragraphs without losing decisions", "task_type": "document"}
+{"text": "find the training matrix requirements in the competency assurance document", "task_type": "document"}
+{"text": "according to the sop what is the maximum allowable differential pressure across the filter", "task_type": "document"}
+{"text": "cross check this method statement against the lifting procedure and list conflicts", "task_type": "document"}
+{"text": "summarize the insurance survey report and its recommendations", "task_type": "document"}
+{"text": "what are the guarantee figures in the licensor's process design package", "task_type": "document"}
+{"text": "locate the paragraph on interim repairs in the fitness for service assessment", "task_type": "document"}
+{"text": "what does this pressure gauge in the photo read", "task_type": "vision"}
+{"text": "read the equipment tag number off this nameplate picture", "task_type": "vision"}
+{"text": "is the corrosion in this image superficial or does it need inspection", "task_type": "vision"}
+{"text": "what valves are shown between the pump and the exchanger in this p&id scan", "task_type": "vision"}
+{"text": "describe the damage visible on this pipe support in the attached photo", "task_type": "vision"}
+{"text": "transcribe the handwritten readings from this logsheet photo", "task_type": "vision"}
+{"text": "what does the level gauge show in this picture of the separator", "task_type": "vision"}
+{"text": "identify the flange rating stamped on the fitting in this image", "task_type": "vision"}
+{"text": "from this photo of the control panel which alarms are lit", "task_type": "vision"}
+{"text": "read the serial number from this compressor nameplate image", "task_type": "vision"}
+{"text": "does the weld in this close-up photo show undercut or porosity", "task_type": "vision"}
+{"text": "what safety signage is visible at the entrance in this site photo", "task_type": "vision"}
+{"text": "count the scaffold tubes visible in this picture of the tower", "task_type": "vision"}
+{"text": "what is the reading on the temperature indicator in this thermal image", "task_type": "vision"}
+{"text": "look at this scanned isometric drawing and tell me the line number", "task_type": "vision"}
+{"text": "in this photograph which valve is passing based on the frost line", "task_type": "vision"}
+{"text": "describe the paint condition of the tank shell in the attached image", "task_type": "vision"}
+{"text": "read the totalizer value from this flow meter display photo", "task_type": "vision"}
+{"text": "is the gasket seated correctly in this flange assembly picture", "task_type": "vision"}
+{"text": "what instrument tags can you read in this junction box photo", "task_type": "vision"}
+{"text": "from the scanned p&id which lines have spectacle blinds", "task_type": "vision"}
+{"text": "does this ultrasonic thickness gauge display show a reading below 6 mm", "task_type": "vision"}
+{"text": "identify the type of pump from this cutaway photograph", "task_type": "vision"}
+{"text": "what does the sight glass show in this boiler picture", "task_type": "vision"}
+{"text": "check this image of the cable tray and list visible defects", "task_type": "vision"}
+{"text": "read the calibration sticker date in this instrument photo", "task_type": "vision"}
+{"text": "what hazard symbols appear on the drum label in this picture", "task_type": "vision"}
+{"text": "from this aerial photo how many floating roof tanks are visible", "task_type": "vision"}
+{"text": "describe the sludge level visible in this open manway photo", "task_type": "vision"}
+{"text": "which position is the manual valve handle in this photograph", "task_type": "vision"}
+{"text": "read the draft gauge in this furnace sight port image", "task_type": "vision"}
+{"text": "what pipe class is stencilled on the line in this photo", "task_type": "vision"}
+{"text": "look at this vibration analyzer screen photo and read the peak value", "task_type": "vision"}
+{"text": "in the attached scan of the loop diagram what is the controller tag", "task_type": "vision"}
+{"text": "does the ladder in this image meet the cage requirement visually", "task_type": "vision"}
+{"text": "extract the table from this photographed page of the logbook", "task_type": "vision"}
+{"text": "what colour is the flare flame in this night photo and what does it suggest", "task_type": "vision"}
+{"text": "read the oil level in the gearbox sight glass from this image", "task_type": "vision"}
+{"text": "identify visible leak points in this thermal camera capture", "task_type": "vision"}
+{"text": "from this scanned drawing title block what is the revision and date", "task_type": "vision"}
+{"text": "summarise the wall-loss figures in this table by month and flag the worst three", "task_type": "data"}
+{"text": "calculate the average corrosion rate from these thickness readings", "task_type": "data"}
+{"text": "what is the trend in furnace efficiency over the last 12 rows", "task_type": "data"}
+{"text": "compute the total downtime hours per unit from this outage table", "task_type": "data"}
+{"text": "which pump shows the highest vibration in this spreadsheet of readings", "task_type": "data"}
+{"text": "work out the remaining life of the line given these annual thickness values", "task_type": "data"}
+{"text": "compare planned versus actual manhours in this turnaround table", "task_type": "data"}
+{"text": "find outliers in these daily throughput numbers", "task_type": "data"}
+{"text": "what percentage of work orders were closed on time this quarter given this list", "task_type": "data"}
+{"text": "calculate the mean time between failures from these breakdown dates", "task_type": "data"}
+{"text": "build a monthly summary of flaring volumes from this table", "task_type": "data"}
+{"text": "rank the exchangers by fouling factor from this dataset", "task_type": "data"}
+{"text": "compute the yield loss in tonnes given these feed and product figures", "task_type": "data"}
+{"text": "what is the correlation between ambient temperature and cooling water return in this data", "task_type": "data"}
+{"text": "sum the chemical consumption by month and highlight anomalies", "task_type": "data"}
+{"text": "given these inspection results what fraction of points fall below retirement thickness", "task_type": "data"}
+{"text": "average the last 30 days of tank levels and give the daily change rate", "task_type": "data"}
+{"text": "produce a variance table comparing budget and actual for these cost lines", "task_type": "data"}
+{"text": "from this sheet which vendor has the longest average delivery delay", "task_type": "data"}
+{"text": "compute energy intensity per tonne of product from these utility numbers", "task_type": "data"}
+{"text": "what is the 95th percentile of these pressure spikes", "task_type": "data"}
+{"text": "aggregate these shift readings into daily minimum maximum and mean", "task_type": "data"}
+{"text": "estimate next month's demand using a simple moving average of this series", "task_type": "data"}
+{"text": "which three heat exchangers account for most of the duty in this table", "task_type": "data"}
+{"text": "check whether the difference between these two pump curves is significant", "task_type": "data"}
+{"text": "convert this table of readings into weekly totals with percentage change", "task_type": "data"}
+{"text": "count the permits issued per area per week from this register extract", "task_type": "data"}
+{"text": "given these lab results how many samples exceed the sulfur spec", "task_type": "data"}
+{"text": "derive the availability percentage per compressor from these run hours", "task_type": "data"}
+{"text": "what is the median repair cost in this list of work orders", "task_type": "data"}
+{"text": "normalise these emissions figures per tonne of throughput and rank the units", "task_type": "data"}
+{"text": "calculate cumulative production year to date from these daily figures", "task_type": "data"}
+{"text": "from this attendance sheet what is the average overtime per technician", "task_type": "data"}
+{"text": "identify the week with the steepest rise in differential pressure in this series", "task_type": "data"}
+{"text": "compute the ratio of reactive to planned maintenance from these counts", "task_type": "data"}
+{"text": "given these tank dip readings reconcile the stock movement for the month", "task_type": "data"}
+{"text": "what is the standard deviation of these octane results by batch", "task_type": "data"}
+{"text": "turn these quarterly figures into year on year growth percentages", "task_type": "data"}
+{"text": "how many days of inventory remain given this consumption table", "task_type": "data"}
+{"text": "fit a linear trend to these thickness readings and give the slope per year", "task_type": "data"}
