@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -16,4 +17,9 @@ export default defineConfig({
     },
   },
   build: { outDir: 'dist', sourcemap: true },
+  test: {
+    // The store test drives the real SSE client, which needs an absolute base.
+    env: { VITE_API_BASE: 'http://127.0.0.1:8178' },
+    testTimeout: 20000,
+  },
 });
