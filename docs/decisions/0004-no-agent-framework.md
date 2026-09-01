@@ -6,22 +6,28 @@
 
 ## Context
 
-<!-- TO BE FILLED IN. Points to cover:
-     - the loop we need is roughly 200 lines: prompt, parse tool call, execute,
-       observe, repeat, bounded by MAX_STEPS
-     - what LangChain/LlamaIndex/CrewAI add on top, and what they assume
-       (hosted models, network at import, large dependency trees)
-     - offline packaging cost: every transitive dependency is a wheel we have
-       to vendor and a thing that can fail on the demo host
-     - debuggability at 2am the night before: our own stack trace vs theirs
-     - the honest counter-argument: we will reimplement retries, and we should
-       say so rather than pretend we won't
--->
+The loop we need is small: prompt, parse a grammar-constrained tool call,
+execute, observe, repeat, bounded by MAX_STEPS. It landed at ~300 lines
+(backend/agent/loop.py) including loop detection, retry caps, compaction and
+audit persistence. LangChain/LlamaIndex/CrewAI add abstraction layers that
+assume hosted models, sometimes touch the network at import, and each drag in
+a dependency tree that we would have to vendor wheel-by-wheel into the
+offline bundle — every transitive dependency is a thing that can fail on the
+demo host with no PyPI to reach. And when the loop misbehaves the night
+before the demo, the stack trace is either 300 lines of ours or 30 frames of
+someone else's. Evaluators will ask how the loop works; "here is the file"
+is an answer, "here is the framework" is not.
 
 ## Decision
 
-<!-- TO BE FILLED IN -->
+The agent loop is hand-written in backend/agent/loop.py; no agent framework
+anywhere in the dependency tree.
 
 ## Consequences
 
-<!-- TO BE FILLED IN -->
+We reimplemented things frameworks give away — retries, loop detection,
+context compaction — and we own their bugs; that is a real cost and we paid
+it. In return: zero framework dependencies to vendor, every control-flow
+decision explainable line-by-line, and event emission/audit persistence woven
+exactly where our contract needs them rather than adapted around someone
+else's callback model.

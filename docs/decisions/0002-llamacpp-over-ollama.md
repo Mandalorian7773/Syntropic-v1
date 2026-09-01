@@ -6,20 +6,28 @@
 
 ## Context
 
-<!-- TO BE FILLED IN. Points to cover:
-     - what we actually need control over (VRAM budget, KV cache quant,
-       n_gpu_layers, grammar-constrained decoding, mmproj for vision)
-     - what Ollama abstracts away that we cannot afford to lose on 8 GB
-     - the air-gap angle: what each one does on first run, and whether it
-       phones anywhere
-     - model swap control: who decides when a model is evicted
--->
+On 6.5 GB of usable VRAM every knob matters: `n_gpu_layers`, q8_0 KV cache
+(halves KV memory, the difference between 16k context fitting and not),
+`--mmproj` for vision input, and above all **GBNF grammar-constrained
+decoding**, which our tool-call protocol depends on (agent/grammar.py). Ollama
+exposes a curated subset of these; its structured output is JSON-schema-based
+and narrower than raw GBNF, and its automatic memory management decides for
+itself when to evict a model. We need eviction to be OUR decision, announced
+over SSE (`model.loading` with `evicting` and `eta_s`) before it blocks.
+On the air-gap side, llama-server is one process with zero first-run
+downloads; Ollama's registry-shaped workflow is one more thing to prove
+inert to a judge.
 
 ## Decision
 
-<!-- TO BE FILLED IN -->
+We run `llama-server` directly and wrote our own ~100-line supervisor
+(backend/llm/manager.py) for load/evict, instead of using Ollama.
 
 ## Consequences
 
-<!-- TO BE FILLED IN. Be honest about what we gave up: Ollama's setup is
-     genuinely easier and we are choosing to do that work ourselves. -->
+We gave up Ollama's genuinely easier setup and model management UX; we own
+process supervision, health probing and swap timing ourselves, and that code
+is ours to debug at 2am. In exchange: full GBNF support at the decoder,
+deterministic single-residency on the GPU, swap events the UI can narrate
+honestly, and an inference stack whose only network behaviour is listening on
+localhost.

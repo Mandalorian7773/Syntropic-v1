@@ -35,11 +35,14 @@ models:
   # ---------------------------------------------------------------------------
   # Coder. Loaded only when the router is confident the task is code, because
   # swapping models costs ~8 s of visible dead air (see the model.loading event).
+  # Deliberately does NOT advertise `general`: the routing rule picks the
+  # lowest-VRAM capable model, and a coder that claims `general` would win
+  # every plain question and drag chat quality down with it.
   # ---------------------------------------------------------------------------
   - id: qwen3-coder-8b
     path: models/qwen3-coder-8b-q4_k_m.gguf
     mmproj: null
-    capabilities: [general, code]
+    capabilities: [code]
     context: 16384
     vram_mb: 5100
     default: false

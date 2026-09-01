@@ -1,68 +1,364 @@
 """Backend gateway. Owner: person 3.
 
-Today this is a scaffold with exactly two live endpoints. It exists to prove
-the SSE plumbing works end to end before any feature is written:
+Wires the pipeline the scaffold promised: router -> model manager -> agent
+loop -> tools, with every event mirrored into the audit log and streamed to
+the SPA as SSE. Request/response shapes come from contracts and only from
+contracts.
 
-    GET  /api/health   real HealthResponse shape, fake values
-    POST /api/chat     three hardcoded contract events over SSE
-
-Person 3 replaces the hardcoded stream with the real router -> model manager ->
-agent loop pipeline. Everything else in the contract API table is still to do;
-add endpoints here and keep the request/response models coming from contracts.
+Startup order matters and is deliberate:
+  1. air-gap self-check   (AIRGAP_ENFORCE=1 refuses to serve on any failure)
+  2. store + audit        (evidence trail first)
+  3. model manager        (establish what is resident)
+  4. tool registry        (local four, then Person 2's over HTTP)
+  5. router               (train/refresh classifiers, write metrics)
 """
 
 from __future__ import annotations
 
-import asyncio
+import base64
 import os
+import sys
 import time
 import uuid
+from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+import httpx
+from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from contracts import (
+    Attachment,
+    CancelRequest,
+    CancelResponse,
     ChatRequest,
-    Done,
     HealthResponse,
+    ModelInfo,
+    ModelsResponse,
+    RouterDecision,
+    SessionDetail,
     SessionStart,
-    Token,
+    SessionSummary,
+    SessionsResponse,
+    Message,
+    NetworkStatus,
     to_sse,
 )
 
+from agent.loop import AgentLoop
+from audit.logger import AuditLog
+from audit.network import NetworkMonitor, startup_selfcheck
+from db.store import Store
+from llm.client import LLMClient
+from llm.manager import ModelManager, ModelRegistry
+from llm.router import Router
+from sse import Cancels, stream_events
+from tools.files import ListFilesTool, ReadFileTool, WriteFileTool, safe_path
+from tools.registry import Registry
+from tools.sandbox import ExecutePythonTool
+
+
+def _repo_root() -> Path:
+    """Walk up until config/models.yaml appears. Works from a checkout
+    (backend/ beside config/) and from the image (/app/backend beside /app/config)."""
+    here = Path(__file__).resolve().parent
+    for candidate in (here, *here.parents):
+        if (candidate / "config" / "models.yaml").is_file():
+            return candidate
+    raise FileNotFoundError("config/models.yaml not found above " + str(here))
+
+
+ROOT = _repo_root()
+MODEL_ENDPOINT = os.getenv("MODEL_ENDPOINT", "http://localhost:8080")
+RAG_ENDPOINT = os.getenv("RAG_ENDPOINT", "http://localhost:8001")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+WORKSPACE_DIR = os.getenv("WORKSPACE_DIR", str(ROOT / "workspace"))
+ARTIFACTS_DIR = os.getenv("ARTIFACTS_DIR", str(ROOT / "artifacts"))
+MODELS_DIR = os.getenv("MODELS_DIR", str(ROOT / "models"))
+DB_PATH = os.getenv("DB_PATH", str(ROOT / "data" / "workbench.db"))
+DATA_DIR = str(Path(DB_PATH).parent)
+AIRGAP_ENFORCE = os.getenv("AIRGAP_ENFORCE", "0") == "1"
+
 app = FastAPI(title="SIH26117 backend", version="0.1.0")
 
-MAX_STEPS = int(os.getenv("MAX_STEPS", "10"))
+store: Store
+audit: AuditLog
+manager: ModelManager
+llm: LLMClient
+registry: Registry
+router: Router
+loop: AgentLoop
+monitor: NetworkMonitor
+cancels = Cancels()
 
 
-@app.get("/api/health", response_model=HealthResponse)
-async def health() -> HealthResponse:
-    # Real values arrive when llm/manager.py and the qdrant client exist.
-    return HealthResponse(ok=True, model_loaded=None, qdrant=False, vram_free_mb=0)
+@app.on_event("startup")
+async def startup() -> None:
+    global store, audit, manager, llm, registry, router, loop, monitor
+
+    checks = startup_selfcheck()
+    # Inside the compose container the isolation comes from the internal:true
+    # network and nft is not installed there; the nftables assertion is only
+    # fatal where the host layer is expected (AIRGAP_REQUIRE_NFT=1, bare metal).
+    require_nft = os.getenv("AIRGAP_REQUIRE_NFT", "0") == "1"
+    failed = [c for c in checks if not c["passed"]
+              and (c["check"] != "nftables_rules_loaded" or require_nft)]
+    if AIRGAP_ENFORCE and failed:
+        for c in failed:
+            print(f"AIRGAP CHECK FAILED: {c['check']}: {c['detail']}", file=sys.stderr)
+        # Refusing to start is the feature: an un-air-gapped sovereign demo
+        # is a false claim with a UI.
+        raise SystemExit("air-gap self-check failed and AIRGAP_ENFORCE=1")
+
+    Path(WORKSPACE_DIR).mkdir(parents=True, exist_ok=True)
+    Path(ARTIFACTS_DIR).mkdir(parents=True, exist_ok=True)
+    store = Store(DB_PATH)
+    audit = AuditLog(store)
+    audit.record("startup.airgap_selfcheck",
+                 {"enforced": AIRGAP_ENFORCE, "checks": checks})
+    monitor = NetworkMonitor()
+
+    model_registry = ModelRegistry(str(ROOT / "config" / "models.yaml"))
+    manager = ModelManager(
+        model_registry, MODEL_ENDPOINT, MODELS_DIR,
+        estimate_load_s=store.estimate_load_s, record_load=store.record_load,
+    )
+    await manager.startup()
+    llm = LLMClient(manager)
+
+    registry = Registry()
+    for tool in (ReadFileTool(), WriteFileTool(), ListFilesTool(), ExecutePythonTool()):
+        registry.register(tool)
+    remote = registry.register_remote(RAG_ENDPOINT)
+    audit.record("startup.tools", {"registered": registry.names(), "remote": remote})
+
+    router = Router(model_registry, RAG_ENDPOINT,
+                    str(ROOT / "config" / "router_trainset.jsonl"), DATA_DIR)
+    try:
+        metrics = router.prepare()
+        audit.record("startup.router", metrics)
+    except Exception as exc:
+        audit.record("startup.router", {"error": str(exc)})
+
+    loop = AgentLoop(llm, registry, store, audit, WORKSPACE_DIR, ARTIFACTS_DIR)
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    manager.shutdown()
+    store.close()
+
+
+# --- chat ---------------------------------------------------------------------
+
+
+def _decide(message: str, attachments: list[Attachment]) -> RouterDecision:
+    try:
+        return router.decide(message, attachments, manager.loaded_id)
+    except Exception as exc:
+        default = manager.registry.default
+        return RouterDecision(
+            model_id=default.id, task_type="general", confidence=0.0,
+            reason=f"router unavailable ({type(exc).__name__}); using default model",
+            alternatives=[],
+        )
+
+
+def _user_content(message: str, attachments: list[Attachment]) -> str | list[dict]:
+    """Plain string, unless an image attachment turns it into multimodal parts."""
+    images = [a for a in attachments if a.mime.startswith("image/") and a.path]
+    if not images:
+        return message
+    parts: list[dict] = [{"type": "text", "text": message}]
+    for att in images:
+        try:
+            data = safe_path(WORKSPACE_DIR, att.path).read_bytes()
+        except Exception:
+            continue
+        b64 = base64.b64encode(data).decode()
+        parts.append({"type": "image_url",
+                      "image_url": {"url": f"data:{att.mime};base64,{b64}"}})
+    return parts
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
     session_id = req.session_id or str(uuid.uuid4())
-    started = time.monotonic()
+    store.ensure_session(session_id, title=req.message)
+    store.add_message(session_id, "user", req.message)
+    audit.record("prompt", {
+        "message": req.message,
+        "attachments": [a.model_dump() for a in req.attachments],
+    }, session_id)
+    cancel = cancels.register(session_id)
 
-    async def stream():
-        yield to_sse(SessionStart(session_id=session_id, ts=int(time.time())))
-        await asyncio.sleep(0.2)
-        yield to_sse(Token(text=f"scaffold backend received: {req.message}"))
-        await asyncio.sleep(0.2)
-        yield to_sse(
-            Done(
-                stop_reason="final_answer",
-                steps_used=1,
-                tokens_in=0,
-                tokens_out=0,
-                latency_ms=int((time.monotonic() - started) * 1000),
-            )
-        )
+    async def events():
+        start = SessionStart(session_id=session_id, ts=int(time.time()))
+        audit.event(start, session_id)
+        yield start
+
+        decision = _decide(req.message, req.attachments)
+        audit.event(decision, session_id)
+        store.set_task_type(session_id, decision.task_type)
+        yield decision
+
+        spec = manager.registry.get(decision.model_id)
+        async for event in loop.run(
+            session_id,
+            _user_content(req.message, req.attachments),
+            decision.model_id,
+            spec.context,
+            cancel,
+        ):
+            yield event
+        cancels.clear(session_id)
 
     return StreamingResponse(
-        stream(),
+        stream_events(events()),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/chat/cancel", response_model=CancelResponse)
+async def chat_cancel(req: CancelRequest) -> CancelResponse:
+    hit = cancels.cancel(req.session_id)
+    audit.record("chat.cancel", {"found": hit}, req.session_id)
+    return CancelResponse(cancelled=hit)
+
+
+@app.post("/api/upload", response_model=Attachment)
+async def upload(file: UploadFile) -> Attachment:
+    """Stage a chat attachment into the workspace; the returned Attachment
+    (with its server-side path) goes back in ChatRequest.attachments."""
+    name = Path(file.filename or "upload.bin").name
+    rel = f"uploads/{uuid.uuid4().hex[:8]}-{name}"
+    target = safe_path(WORKSPACE_DIR, rel)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    data = await file.read()
+    target.write_bytes(data)
+    return Attachment(
+        filename=name,
+        mime=file.content_type or "application/octet-stream",
+        size_bytes=len(data),
+        path=rel,
+    )
+
+
+# --- models / sessions / status -----------------------------------------------
+
+
+@app.get("/api/models", response_model=ModelsResponse)
+async def models() -> ModelsResponse:
+    return ModelsResponse(models=[
+        ModelInfo(
+            id=m.id, capabilities=m.capabilities, context=m.context,
+            vram_mb=m.vram_mb, loaded=(m.id == manager.loaded_id),
+        )
+        for m in manager.registry.models
+    ])
+
+
+@app.get("/api/sessions", response_model=SessionsResponse)
+async def sessions() -> SessionsResponse:
+    return SessionsResponse(sessions=[
+        SessionSummary(
+            session_id=s["session_id"], title=s["title"],
+            created_ts=s["created_ts"], updated_ts=s["updated_ts"],
+            message_count=s["message_count"],
+        )
+        for s in store.list_sessions()
+    ])
+
+
+@app.get("/api/sessions/{session_id}", response_model=SessionDetail)
+async def session_detail(session_id: str) -> SessionDetail:
+    s = store.get_session(session_id)
+    if s is None:
+        raise HTTPException(404, "unknown session")
+    return SessionDetail(
+        session_id=s["session_id"], title=s["title"],
+        created_ts=s["created_ts"], updated_ts=s["updated_ts"],
+        task_type=s["task_type"],
+        messages=[Message(**m) for m in s["messages"]],
+    )
+
+
+@app.get("/api/network/status", response_model=NetworkStatus)
+async def network_status() -> NetworkStatus:
+    return monitor.status()
+
+
+@app.get("/api/audit")
+async def audit_trail(session_id: str | None = None, limit: int = 500) -> JSONResponse:
+    """The evidence trail, raw. This is what goes on screen when a judge asks
+    for proof; acceptance criterion 7 is a query over this."""
+    return JSONResponse({"trail": audit.trail(session_id, limit)})
+
+
+@app.get("/api/router/metrics")
+async def router_metrics() -> JSONResponse:
+    return JSONResponse(router.metrics or {"error": "router not trained"})
+
+
+@app.get("/api/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    qdrant_ok = False
+    try:
+        async with httpx.AsyncClient(timeout=2) as client:
+            qdrant_ok = (await client.get(f"{QDRANT_URL}/readyz")).status_code == 200
+    except httpx.HTTPError:
+        pass
+    return HealthResponse(
+        ok=True, model_loaded=manager.loaded_id,
+        qdrant=qdrant_ok, vram_free_mb=manager.vram_free_mb(),
+    )
+
+
+# --- artifacts + ragsvc proxy ---------------------------------------------------
+
+
+@app.get("/api/artifacts/{artifact_id}")
+async def artifact(artifact_id: str):
+    row = store.get_artifact(artifact_id)
+    if row and Path(row["path"]).is_file():
+        return FileResponse(row["path"], media_type=row["mime"],
+                            filename=row["filename"])
+    # Not one of ours: Person 2's docx/xlsx generators register theirs in ragsvc.
+    return await _proxy("GET", f"/artifacts/{artifact_id}")
+
+
+async def _proxy(method: str, path: str, request: Request | None = None) -> Response:
+    url = f"{RAG_ENDPOINT}{path}"
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            if request is not None:
+                body = await request.body()
+                upstream = await client.request(
+                    method, url, content=body,
+                    headers={k: v for k, v in request.headers.items()
+                             if k.lower() in ("content-type", "content-length")},
+                    params=dict(request.query_params),
+                )
+            else:
+                upstream = await client.request(method, url)
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"ragsvc unreachable: {exc}")
+    return Response(
+        content=upstream.content, status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type"),
+    )
+
+
+@app.api_route("/api/documents", methods=["GET", "POST"])
+async def documents(request: Request) -> Response:
+    return await _proxy(request.method, "/documents", request)
+
+
+@app.api_route("/api/documents/{doc_id}/reindex", methods=["POST"])
+async def reindex(doc_id: str, request: Request) -> Response:
+    return await _proxy("POST", f"/documents/{doc_id}/reindex", request)
+
+
+@app.post("/api/search")
+async def search(request: Request) -> Response:
+    return await _proxy("POST", "/search", request)

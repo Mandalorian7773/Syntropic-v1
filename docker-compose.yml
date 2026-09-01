@@ -82,11 +82,20 @@ services:
       MODELS_DIR: /models
       DB_PATH: /data/workbench.db
       MAX_STEPS: "10"
+      # Refuse to serve if any air-gap assertion fails. This is the demo host;
+      # an un-air-gapped start here is a false sovereignty claim.
+      AIRGAP_ENFORCE: "1"
+      # The sandbox launches SIBLING containers via the host socket, so its
+      # bind mounts resolve against the HOST filesystem, not this container's.
+      SANDBOX_HOST_WORKSPACE: ${PWD}/workspace
     volumes:
       - ./workspace:/workspace
       - ./artifacts:/artifacts
       - ./models:/models:ro
       - ./data:/data
+      # Live registry: adding a model is a YAML edit here plus a weight file
+      # in ./models -- no rebuild (acceptance criterion 1).
+      - ./config:/app/config:ro
       # The sandbox tool launches sibling containers, so the backend needs the
       # host docker socket. Person 3: this is a privilege boundary -- document
       # it in an ADR before the demo, judges will ask.
