@@ -136,6 +136,7 @@ export const useSession = create<SessionState>((set, get) => ({
       (message: string) =>
         set((s) => ({
           phase: 'idle',
+          trace: freezeOpenSteps(s.trace),
           errors: [
             ...s.errors,
             { code: 'TRANSPORT', message, recoverable: false, ts: Date.now() },
@@ -154,6 +155,7 @@ export const useSession = create<SessionState>((set, get) => ({
     set((s) => ({
       phase: 'idle',
       swap: null,
+      trace: freezeOpenSteps(s.trace),
       lastRun: s.lastRun ?? {
         stopReason: 'cancelled', stepsUsed: s.step,
         tokensIn: 0, tokensOut: 0, latencyMs: 0,
@@ -279,6 +281,7 @@ function reduce(s: SessionState, ev: Event): Partial<SessionState> {
           },
         ],
         phase: ev.recoverable ? s.phase : 'idle',
+        trace: ev.recoverable ? s.trace : freezeOpenSteps(s.trace),
       };
 
     case 'done':
@@ -286,6 +289,7 @@ function reduce(s: SessionState, ev: Event): Partial<SessionState> {
       return {
         phase: 'idle',
         swap: null,
+        trace: freezeOpenSteps(s.trace),
         lastRun: {
           stopReason: ev.stop_reason,
           stepsUsed: ev.steps_used,
@@ -304,6 +308,21 @@ function reduce(s: SessionState, ev: Event): Partial<SessionState> {
 }
 
 // --- helpers ---------------------------------------------------------------
+
+/**
+ * A run can end with a step still open -- a fatal error, a cancel, or a
+ * backend that dies mid-tool. Freeze those rows at their elapsed time so the
+ * live counter stops; leaving it ticking forever says "still working" about a
+ * run that is over.
+ */
+function freezeOpenSteps(trace: TraceStep[]): TraceStep[] {
+  const now = Date.now();
+  return trace.map((t) =>
+    t.ok === null && t.durationMs === null
+      ? { ...t, durationMs: now - t.startedAt }
+      : t,
+  );
+}
 
 function markLastAssistant(
   messages: ChatMessage[],

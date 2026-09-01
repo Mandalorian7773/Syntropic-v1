@@ -56,19 +56,29 @@ export default function NetworkPanel() {
 
   const total = (status?.external_packets ?? 0) + (status?.dns_queries ?? 0);
   const bad = breached.current || total > 0;
+  // Zero observed egress with the firewall rules DOWN is a weaker claim than
+  // zero with them up: nothing was stopped, nothing merely happened to leave.
+  // Not a breach, so the counter stays green -- but the caveat has to be on
+  // screen, because this panel is the sovereignty claim.
+  const unenforced = status !== null && !status.rules_active && !bad;
 
   return (
     <section
       className={`panel shrink-0 border-2 ${
-        bad ? 'border-fault bg-fault-deep/40' : 'border-iso-dim bg-iso-deep/25'
+        bad ? 'border-fault bg-fault-deep/40'
+        : unenforced ? 'border-work-dim bg-work-deep/25'
+        : 'border-iso-dim bg-iso-deep/25'
       }`}
     >
       <header className="panel-head border-b-0 bg-transparent">
         <h2 className="label">Network isolation</h2>
         <span className="flex items-center gap-1.5">
-          <Dot tone={!reachable ? 'work' : bad ? 'fault' : 'iso'} />
+          <Dot tone={!reachable || unenforced ? 'work' : bad ? 'fault' : 'iso'} />
           <span className="label">
-            {!reachable ? 'monitor offline' : bad ? 'breach' : 'monitoring'}
+            {!reachable ? 'monitor offline'
+              : bad ? 'breach'
+              : unenforced ? 'unenforced'
+              : 'monitoring'}
           </span>
         </span>
       </header>
