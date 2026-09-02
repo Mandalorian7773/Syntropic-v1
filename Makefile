@@ -10,6 +10,9 @@ SHELL := /bin/bash
 
 ROOT    := $(shell pwd)
 VENV    := $(ROOT)/.venv
+# Override when your default python3 is not 3.11/3.12:
+#     make setup PYTHON3=/usr/bin/python3.11
+PYTHON3 ?= python3
 PY      := $(VENV)/bin/python
 PIP     := $(VENV)/bin/pip
 UVICORN := $(VENV)/bin/uvicorn
@@ -34,7 +37,17 @@ help:
 
 setup: ## install contracts + both services + frontend deps, then run types
 	@echo "==> setup [1/4] python venv"
-	@test -d $(VENV) || python3 -m venv $(VENV)
+	@# ragsvc pins python <3.13: rapidocr-onnxruntime 1.x refuses to install on
+	@# 3.13, and rapidocr 3.x fetches its weights at first use, which breaks the
+	@# air-gap. Fail here with a sentence rather than 200 lines of pip resolver
+	@# output an hour later.
+	@$(PYTHON3) -c 'import sys; v=sys.version_info; sys.exit(0 if (3,11) <= (v.major,v.minor) < (3,13) else 1)' \
+	  || { echo "    ERROR: need Python 3.11 or 3.12, found $$($(PYTHON3) -V 2>&1)."; \
+	       echo "    ragsvc's OCR backend does not build on 3.13. Install 3.11 and"; \
+	       echo "    re-run, or point this at it:"; \
+	       echo "        make setup PYTHON3=/path/to/python3.11"; \
+	       exit 1; }
+	@test -d $(VENV) || $(PYTHON3) -m venv $(VENV)
 	@$(PIP) install --quiet --upgrade pip
 	@echo "==> setup [2/4] contracts + backend + ragsvc (editable)"
 	@# editable_mode=compat writes a plain .pth. Without it, running python from

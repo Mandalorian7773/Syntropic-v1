@@ -259,6 +259,87 @@ def _window(line: str, terms: set[str], budget: int) -> str:
     return ("..." if start else "") + line[start:end].strip() + ("..." if end < len(line) else "")
 
 
+def _page_index(document: dict, pages: list[dict]) -> tuple[str, str | None]:
+    """A per-page contents listing for a document too long to return whole.
+
+    Each line is a page number and the first heading or sentence on it, which
+    is enough for the model to pick the two or three pages it needs and call
+    back with `pages=[...]`. The full text is still spilled to raw_path.
+    """
+    lines = [
+        f"{document['filename']} has {document['pages']} pages, too long to "
+        f"return in full. Page index below -- call read_document again with "
+        f"pages=[n] for the pages you need."
+    ]
+    # Every page of a real document opens with the same letterhead and running
+    # header, so "first non-empty line" indexes twenty pages as twenty copies
+    # of the company name. Prefer the first numbered heading; fall back to the
+    # first line that is not repeated across most of the document.
+    counts: dict[str, int] = {}
+    for page in pages:
+        for line in {ln.strip() for ln in page["text"].splitlines() if ln.strip()}:
+            counts[line] = counts.get(line, 0) + 1
+    repeated = max(2, len(pages) // 2)
+
+    for page in pages:
+        candidates = [ln.strip() for ln in page["text"].splitlines() if ln.strip()]
+        preview_line = next(
+            (ln for ln in candidates if HEADING_RE.match(ln) and not ln.startswith("|")),
+            next(
+                (ln for ln in candidates if counts.get(ln, 0) < repeated),
+                candidates[0] if candidates else "",
+            ),
+        )
+        preview, _ = ragbudget.truncate_to_tokens(" ".join(preview_line.split()), 18)
+        lines.append(f"  p.{page['page']}: {preview}")
+
+    body = "\n".join(
+        f"--- {document['filename']} page {p['page']} of {document['pages']} ---\n{p['text']}"
+        for p in pages
+    )
+    raw_path = ragbudget.spill(body, f"read-{document['id'][:8]}")
+    lines.append(f"Full text written to {raw_path}.")
+    content, _ = ragbudget.truncate_to_tokens("\n".join(lines), cfg.TOOL_TOKEN_BUDGET)
+    return content, raw_path
+
+
+HEADING_RE = re.compile(r"^\s*\d+(?:\.\d+)*\.?\s+\S")
+
+
+def _section_at(text: str, query: str, fallback: str) -> str:
+    """The section heading governing the part of the chunk that matched.
+
+    A chunk carries one `section`, taken from its first block. When a chunk
+    spans a section boundary -- routine at 600 tokens -- that label describes
+    where the chunk *started*, not where the answer is. Measured case: the
+    PSV-2103 valve register is section 6, sits in a chunk that opens in section
+    3, and every citation for it read "3. Test Medium and Equipment". The page
+    was right and the section name was wrong, which is worse than useless on a
+    slide: it points a reviewer at the wrong part of the document.
+
+    So the heading is recovered from the text itself, by walking back from the
+    best-matching line to the nearest heading above it.
+    """
+    lines = text.splitlines()
+    terms = _query_terms(query)
+    if not terms or not lines:
+        return fallback
+    scores = [_line_score(line, terms) for line in lines]
+    if max(scores, default=0) == 0:
+        return fallback
+
+    best = max(range(len(lines)), key=lambda i: (scores[i], -len(lines[i])))
+    for index in range(best, -1, -1):
+        candidate = lines[index].strip()
+        if not candidate or candidate.startswith("|") or len(candidate) > 90:
+            continue
+        if HEADING_RE.match(candidate) or (
+            candidate.isupper() and len(candidate.split()) > 1
+        ):
+            return candidate
+    return fallback
+
+
 def focused_snippet(text: str, query: str, budget: int = 90) -> str:
     """Public wrapper, shared with the /search endpoint.
 
@@ -304,7 +385,7 @@ def _hits_payload(hits: list, query: str) -> str:
             "doc_id": hit.doc_id,
             "filename": hit.filename,
             "page": hit.page,
-            "section": hit.section,
+            "section": _section_at(hit.text, query, hit.section),
             "score": round(float(hit.score), 4),
             "snippet": "",
         }
@@ -368,7 +449,19 @@ class ReadDocument(Tool):
             f"{page['text']}"
             for page in pages
         )
-        content, raw_path = ragbudget.fit(body, f"read-{document['id'][:8]}")
+
+        # A whole-document read of a long document used to spend the entire
+        # budget on the first 5% of page 1 -- measured: 917 of 18,888 tokens --
+        # and whether the answer survived was luck. Raising the budget is not
+        # the fix: 1000 tokens is the contract that keeps a 16K context alive.
+        # So an unfiltered read of a document too big to show returns a page
+        # index instead, and the model asks for the pages it wants. That is the
+        # same move as query-focused snippets: spend the budget on what was
+        # asked for rather than on whatever happens to come first.
+        if args.pages is None and ragbudget.count_tokens(body) > cfg.TOOL_TOKEN_BUDGET:
+            content, raw_path = _page_index(document, pages)
+        else:
+            content, raw_path = ragbudget.fit(body, f"read-{document['id'][:8]}")
         return ToolResult(
             ok=True, content=content, raw_path=raw_path, duration_ms=_timed(started)
         )

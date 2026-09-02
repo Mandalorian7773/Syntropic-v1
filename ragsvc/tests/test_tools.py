@@ -189,7 +189,39 @@ def test_read_document_truncates_and_spills_a_huge_document(run_context):
 
     spilled = Path(result.raw_path).read_text(encoding="utf-8")
     assert len(spilled) > len(result.content) * 5
-    assert "truncated" in result.content
+
+    # A whole-document read of something too long to show returns a page index,
+    # not the first 5% of page 1. Spending the entire budget on the opening of
+    # a 20-page document and hoping the answer is in it is not a strategy.
+    assert "pages=[" in result.content, "the model is not told how to get the rest"
+    for page in (1, 2, 3):
+        assert f"p.{page}:" in result.content
+
+
+def test_read_document_with_explicit_pages_returns_text_not_an_index(run_context):
+    """Naming pages is the caller saying what it wants; give it the text."""
+    doc_id = str(uuid.uuid4())
+    ragdb.upsert_document(
+        doc_id=doc_id, filename="explicit-pages.pdf", path="/nonexistent/x.pdf",
+        pages=3, chunk_count=0, size_bytes=1, sha256="0" * 64, scanned=False,
+        indexed=False, ingest_ms=0,
+    )
+    ragdb.replace_pages(
+        doc_id,
+        [{"page": n, "text": f"page {n} body. " + HUGE_PARAGRAPH, "scanned": False,
+          "mean_conf": 1.0} for n in (1, 2, 3)],
+    )
+
+    tool = ragtools.BY_NAME["read_document"]
+    result = tool.run(
+        tool.args_model(file_id="explicit-pages.pdf", pages=[2]), run_context
+    )
+
+    assert result.ok
+    assert count_tokens(result.content) <= cfg.TOOL_TOKEN_BUDGET
+    assert "page 2 of 3" in result.content
+    assert "pages=[" not in result.content, "an explicit request got an index instead"
+    assert "truncated" in result.content, "a cut page must say it was cut"
 
 
 def test_read_document_reports_an_unknown_file_without_raising(run_context):

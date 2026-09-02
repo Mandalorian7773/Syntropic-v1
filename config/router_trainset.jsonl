@@ -198,3 +198,43 @@
 {"text": "turn these quarterly figures into year on year growth percentages", "task_type": "data"}
 {"text": "how many days of inventory remain given this consumption table", "task_type": "data"}
 {"text": "fit a linear trend to these thickness readings and give the slope per year", "task_type": "data"}
+{"text": "what is the set pressure of psv-2103", "task_type": "document"}
+{"text": "what is the set pressure of psv-2103 in the sop", "task_type": "document"}
+{"text": "on which line is psv-2103 installed", "task_type": "document"}
+{"text": "summarise the incident report", "task_type": "document"}
+{"text": "summarise the inspection findings", "task_type": "document"}
+{"text": "analyse the corrosion rate trend for this circuit", "task_type": "document"}
+{"text": "what is the design pressure of vessel v-1201", "task_type": "document"}
+{"text": "what corrosion allowance was specified for v-1201", "task_type": "document"}
+{"text": "when is the next internal inspection of v-1201 due", "task_type": "document"}
+{"text": "which api standard governs the inspection of v-1201", "task_type": "document"}
+{"text": "what thickness was measured at cml-12", "task_type": "document"}
+{"text": "what is the calculated corrosion rate at cml-12", "task_type": "document"}
+{"text": "which cml has the lowest remaining life", "task_type": "document"}
+{"text": "what is the retirement thickness for line 8-p-1104", "task_type": "document"}
+{"text": "what is the design temperature of line 6-p-2104", "task_type": "document"}
+{"text": "what material specification is used for line 6-p-2104", "task_type": "document"}
+{"text": "which drawing number shows the debutaniser overhead circuit", "task_type": "document"}
+{"text": "what insulation is specified for line 10-s-3301", "task_type": "document"}
+{"text": "what delivery lead time did the vendor quote", "task_type": "document"}
+{"text": "what is the vendor's quotation reference number", "task_type": "document"}
+{"text": "what warranty period did the vendor offer", "task_type": "document"}
+{"text": "what expenditure was approved for the nozzle repair", "task_type": "document"}
+{"text": "who gave final approval for the repair note", "task_type": "document"}
+{"text": "who authorises removal of a relief valve from service", "task_type": "document"}
+{"text": "what is the maximum interval between relief valve overhauls", "task_type": "document"}
+{"text": "which test medium is specified for bench testing", "task_type": "document"}
+{"text": "at what pressure is the seat tightness test carried out", "task_type": "document"}
+{"text": "how long must test certificates be retained", "task_type": "document"}
+{"text": "what pop test tolerance applies above 70 psig", "task_type": "document"}
+{"text": "what is the vibration alarm limit for centrifugal pumps", "task_type": "document"}
+{"text": "what is the maximum permissible angular misalignment", "task_type": "document"}
+{"text": "what was the immediate cause of the p-101a seal failure", "task_type": "document"}
+{"text": "what actions were raised after the seal failure", "task_type": "document"}
+{"text": "what wall loss was recorded on tube tb-0203", "task_type": "document"}
+{"text": "what is the plugging limit for the exchanger bundle", "task_type": "document"}
+{"text": "cite the page where the relief valve interval is stated", "task_type": "document"}
+{"text": "which page gives the thickness readings and cite it", "task_type": "document"}
+{"text": "look up the set pressure and tell me the page number", "task_type": "document"}
+{"text": "check the uploaded scan for the equipment tag number", "task_type": "document"}
+{"text": "search the ingested documents for the reference number", "task_type": "document"}

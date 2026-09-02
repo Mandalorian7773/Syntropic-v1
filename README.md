@@ -35,7 +35,17 @@ this repo at once. Changing it is a separate PR that all three approve — read
 
 ## Quickstart
 
-Needs Python 3.11, Node 20 and Docker. Nothing else.
+Needs **Python 3.11 or 3.12**, Node 20 and Docker. Nothing else.
+
+> **Not Python 3.13.** `ragsvc` pins `python <3.13` because
+> `rapidocr-onnxruntime` 1.x will not install on it, and the drop-in successor
+> fetches its weights on first use — which would break the air-gap to fix a
+> build error. `make setup` checks this and stops with one sentence rather than
+> a pip resolver dump. If your default `python3` is newer:
+>
+> ```bash
+> make setup PYTHON3=/path/to/python3.11
+> ```
 
 ```bash
 cp .env.example .env     # 1. configure (localhost defaults are correct for solo dev)

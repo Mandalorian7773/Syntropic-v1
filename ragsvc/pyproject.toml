@@ -2,7 +2,12 @@
 name = "ragsvc"
 version = "0.1.0"
 description = "Document ingest, hybrid retrieval and artifact generation. Owner: person 2."
-requires-python = ">=3.11"
+# Upper bound is load-bearing, not caution. rapidocr-onnxruntime 1.x declares
+# python <3.13, so `pip install -e ./ragsvc[ocr]` fails outright on a 3.13
+# interpreter -- and the obvious fix, rapidocr 3.x, downloads its weights on
+# first use. That would trade an install error for a demo that reaches the
+# network, so the pin stays and the Python version moves instead.
+requires-python = ">=3.11,<3.13"
 
 # Everything here is CPU-only and wheel-only. There is no torch in this tree
 # and there must not be: the 6 GB of VRAM belongs to llama-server, and a torch
