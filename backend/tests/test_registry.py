@@ -140,3 +140,44 @@ def test_remote_tool_untyped_property_accepts_anything():
     tool = RemoteTool("http://ragsvc.invalid", spec)
     assert tool.args_model(blob={"a": 1}).blob == {"a": 1}
     assert tool.args_model(blob="text").blob == "text"
+
+
+def test_prompt_block_shows_nested_shapes_not_just_names():
+    """The model must see that sections is a list of OBJECTS.
+
+    ragsvc hides Section behind a $ref. With names only, the prompt read
+    "create_docx(template, title, sections)", the model sent a list of
+    strings, and every call was rejected with "Input should be a valid
+    dictionary or instance of Section" -- so the artifact demo could never
+    produce a file.
+    """
+    from tools.registry import RemoteTool
+
+    spec = {
+        "name": "create_docx",
+        "description": "Generate a Word document.",
+        "parameters": {
+            "$defs": {
+                "Section": {
+                    "type": "object",
+                    "properties": {
+                        "heading": {"type": "string"},
+                        "body": {"type": "string"},
+                        "bullets": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            },
+            "properties": {
+                "title": {"type": "string"},
+                "sections": {"type": "array",
+                             "items": {"$ref": "#/$defs/Section"}},
+            },
+            "required": ["title"],
+        },
+    }
+    r = Registry()
+    r.register(RemoteTool("http://ragsvc.invalid", spec))
+    block = r.prompt_block()
+    assert "sections?: [{heading, body, bullets}]" in block, block
+    assert "title: str" in block            # required -> no '?'
+    assert "sections?" in block             # optional -> '?'

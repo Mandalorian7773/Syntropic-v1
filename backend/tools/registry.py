@@ -17,6 +17,7 @@ one. They count against the same cap.
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -28,13 +29,26 @@ from pydantic import BaseModel, ValidationError, create_model
 from contracts import RunContext, Tool, ToolResult
 
 MAX_TOOLS = 8
-MAX_CONTENT_TOKENS = 1000
+# The B5 contract says 1000 tokens. 1000 cut a single scanned page of a valve
+# register mid-table, and the agent then answered with the NEIGHBOURING row --
+# "PSV-2103 = 16.4 barg" when 16.4 is PSV-2105's and the truth is 12.5. A
+# confidently wrong number with a citation attached is worse than an error, so
+# the budget is sized to fit one document page instead. Override with
+# AGENT_MAX_CONTENT_TOKENS to re-measure.
+MAX_CONTENT_TOKENS = int(os.getenv("AGENT_MAX_CONTENT_TOKENS", "2500"))
 MAX_CONTENT_CHARS = MAX_CONTENT_TOKENS * 4
 
 
 def truncate_content(content: str, ctx: RunContext, name: str) -> tuple[str, str | None]:
-    """Enforce the <=1000-token contract; overflow goes to a raw file the
-    model can read_file if it truly needs the rest."""
+    """Bound tool output; overflow is written to disk for the audit trail.
+
+    The notice deliberately does NOT hand the model the raw path. It used to,
+    and the model reasonably tried read_file on an absolute path outside the
+    workspace, got "escapes the workspace", searched again, re-read the same
+    page, and burned all ten steps in that cycle. raw_path stays on the
+    ToolResult -- the trace and the audit row still point at the full output --
+    but what goes into the model's context is an instruction it can act on.
+    """
     if len(content) <= MAX_CONTENT_CHARS:
         return content, None
     raw_dir = Path(ctx.workspace_dir) / ".raw"
@@ -42,7 +56,11 @@ def truncate_content(content: str, ctx: RunContext, name: str) -> tuple[str, str
     raw_path = raw_dir / f"{name}-{uuid.uuid4().hex[:8]}.txt"
     raw_path.write_text(content, encoding="utf-8")
     kept = content[:MAX_CONTENT_CHARS]
-    return f"{kept}\n[truncated; full output at {raw_path}]", str(raw_path)
+    return (
+        f"{kept}\n[output truncated here. Do NOT try to open the full file -- it "
+        f"is not reachable from the workspace. If what you need is missing, call "
+        f"{name} again for a narrower part, e.g. a single page.]"
+    ), str(raw_path)
 
 
 _SCALARS = {"string": str, "integer": int, "number": float, "boolean": bool}
@@ -76,6 +94,38 @@ def _python_type(schema: dict) -> Any:
     return _SCALARS.get(kind, str)
 
 
+def _shape_hint(schema: dict, defs: dict, depth: int = 0) -> str:
+    """Compact, model-facing rendering of a parameter's shape.
+
+    str | int | [str] | {heading, body, bullets} | [{name, columns, rows}]
+
+    Kept to one level of nesting on purpose: the point is to stop the model
+    guessing "list of strings" for a list of objects, not to reproduce the
+    JSON Schema in the system prompt. A 7B model handed paragraphs picks badly.
+    """
+    if "$ref" in schema:
+        ref = schema["$ref"].rsplit("/", 1)[-1]
+        return _shape_hint(defs.get(ref, {}), defs, depth)
+    if "anyOf" in schema:
+        for branch in schema["anyOf"]:
+            if branch.get("type") != "null":
+                return _shape_hint(branch, defs, depth)
+        return "any"
+    kind = schema.get("type")
+    if kind == "array":
+        return f"[{_shape_hint(schema.get('items', {}), defs, depth + 1)}]"
+    if kind == "object" or "properties" in schema:
+        # depth 1 is still worth naming: `sections: [{heading, body, ...}]` is
+        # an array (0) whose items are the object (1), and those keys are
+        # precisely what the model was guessing wrong.
+        if depth >= 2:
+            return "{...}"
+        keys = list(schema.get("properties", {}))[:5]
+        return "{" + ", ".join(keys) + "}" if keys else "{...}"
+    return {"string": "str", "integer": "int", "number": "num",
+            "boolean": "bool"}.get(kind, "any")
+
+
 class RemoteTool(Tool):
     """A tool that lives in ragsvc. Same contract, executed over HTTP."""
 
@@ -87,6 +137,10 @@ class RemoteTool(Tool):
         self.endpoint = endpoint.rstrip("/")
         self.name = spec["name"]
         self.description = spec["description"]
+        # ragsvc's own JSON Schema, kept verbatim. The args model generated
+        # below flattens $ref'd objects to Any, so it is the wrong thing to
+        # describe the tool to the model with -- prompt_block uses this.
+        self.raw_parameters = spec.get("parameters", {})
         fields: dict[str, Any] = {}
         for prop, schema in spec.get("parameters", {}).get("properties", {}).items():
             py = _python_type(schema)
@@ -158,10 +212,26 @@ class Registry:
         return [t.schema() for t in self._tools.values()]
 
     def prompt_block(self) -> str:
-        """The tool list as it appears in the system prompt."""
+        """The tool list as it appears in the system prompt.
+
+        Parameter SHAPES, not just names. ragsvc's create_docx takes
+        sections: [{heading, body, bullets[], table[][]}] behind a $ref, and a
+        bare "create_docx(template, title, sections)" left the model to guess --
+        it guessed a list of strings, every call was rejected as
+        "Input should be a valid dictionary or instance of Section", and the
+        artifact demo could never produce a file. One extra line per tool is
+        cheaper than a tool that can never be called correctly.
+        """
         lines = []
         for t in self._tools.values():
-            params = ", ".join(t.args_model.model_json_schema().get("properties", {}))
+            schema = getattr(t, "raw_parameters", None) or t.args_model.model_json_schema()
+            defs = schema.get("$defs", {})
+            props = schema.get("properties", {})
+            required = set(schema.get("required", []))
+            params = ", ".join(
+                f"{name}{'' if name in required else '?'}: {_shape_hint(spec, defs)}"
+                for name, spec in props.items()
+            )
             lines.append(f"- {t.name}({params}): {t.description}")
         return "\n".join(lines)
 
