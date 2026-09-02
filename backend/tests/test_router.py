@@ -40,27 +40,39 @@ def test_heldout_accuracy_reported_and_sane(router):
     assert m["model_choice_accuracy"] >= 0.9
 
 
-def test_image_attachment_is_hard_rule(router):
+def cheapest_with(registry, capability: str) -> str:
+    """The model the routing rule must pick: lowest vram_mb among the capable.
+    Derived from the registry, never hardcoded -- adding a model is a YAML edit
+    (acceptance criterion 1), and a test that pins model ids turns that edit
+    into a code change."""
+    capable = registry.with_capability(capability)
+    assert capable, f"no model in config/models.yaml advertises {capability!r}"
+    return min(capable, key=lambda m: m.vram_mb).id
+
+
+def test_image_attachment_is_hard_rule(router, registry):
     att = Attachment(filename="gauge.jpg", mime="image/jpeg", size_bytes=1, path="x")
     d = router.decide("write a python script to sort numbers", [att], None)
     assert d.task_type == "vision"
     assert d.confidence == 1.0
     assert "hard rule" in d.reason
-    assert d.model_id == "qwen2.5-vl-7b"  # only model with the capability
+    # An unambiguously code-shaped prompt still routes to vision: the rule wins
+    # over the classifier, which is the point of it being a hard rule.
+    assert d.model_id == cheapest_with(registry, "vision")
 
 
-def test_code_routes_to_coder(router):
+def test_code_routes_to_coder(router, registry):
     d = router.decide("write a python function that parses a csv and plots the trend",
                       loaded_id=None, attachments=[])
     assert d.task_type == "code"
-    assert d.model_id == "qwen3-coder-8b"
+    assert d.model_id == cheapest_with(registry, "code")
 
 
-def test_document_routes_to_vl(router):
+def test_document_routes_to_document_model(router, registry):
     d = router.decide("summarize the attached standard operating procedure section",
                       loaded_id=None, attachments=[])
     assert d.task_type == "document"
-    assert d.model_id == "qwen2.5-vl-7b"
+    assert d.model_id == cheapest_with(registry, "document")
 
 
 def test_low_confidence_falls_back_to_default(router, registry):
@@ -73,11 +85,11 @@ def test_low_confidence_falls_back_to_default(router, registry):
 def test_switch_penalty_keeps_incumbent(router, registry):
     """A capable resident model is kept unless the challenger clears
     min_confidence + switch_penalty -- an 8 s reload has to be earned."""
-    d = router.decide("xyzzy general question about things", [],
-                      loaded_id="qwen2.5-vl-7b")
+    incumbent = registry.default.id
+    d = router.decide("xyzzy general question about things", [], loaded_id=incumbent)
     threshold = registry.router.min_confidence + registry.router.switch_penalty
     if d.task_type != "vision" and d.confidence < threshold:
-        assert d.model_id == "qwen2.5-vl-7b"
+        assert d.model_id == incumbent
 
 
 def test_decision_is_explainable(router):

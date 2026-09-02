@@ -9,6 +9,13 @@
 # Everything is a local path. Nothing in this file may be a URL: the demo
 # machine has no route out, and a config that assumes one fails at the worst
 # possible moment.
+#
+# WEIGHT SOURCE (dev machines, today): these paths point at GGUF blobs already
+# on disk in Ollama's content-addressed store. We are NOT running Ollama --
+# llama-server is launched directly by llm/manager.py (see ADR 0002); Ollama is
+# only where the bytes happen to live, and it also ships the llama-server
+# binary we use as LLAMA_SERVER_BIN. For the air-gapped demo host these become
+# plain files under ./models with checksums in models/MANIFEST.yaml.
 # ============================================================================
 
 defaults:
@@ -20,31 +27,45 @@ defaults:
 
 models:
   # ---------------------------------------------------------------------------
-  # Vision-capable generalist. Handles documents, images and everything that is
-  # not clearly code. This is the default because a wrong route to the
-  # generalist is a slow answer; a wrong route away from it is a wrong answer.
+  # Generalist. Handles chat, documents and table/number work. Default because
+  # a wrong route TO the generalist is a slow answer; a wrong route AWAY from
+  # it is a wrong answer.
   # ---------------------------------------------------------------------------
-  - id: qwen2.5-vl-7b
-    path: models/qwen2.5-vl-7b-instruct-q4_k_m.gguf
-    mmproj: models/qwen2.5-vl-7b-mmproj-f16.gguf   # required for image input
-    capabilities: [general, document, vision, data]
-    context: 16384
-    vram_mb: 5600
+  - id: qwen2.5-7b
+    path: C:/Users/mouli/.ollama/models/blobs/sha256-2bada8a7450677000f678be90653b85d364de7db25eb5ea54136ada5f3933730
+    mmproj: null
+    capabilities: [general, document, data]
+    # 8192, not 16384: the card is a 6 GB RTX 4050, and 4.7 GB of weights plus
+    # a 16k KV cache plus the CUDA context does not fit. Measured, not guessed.
+    context: 8192
+    vram_mb: 5300
     default: true
 
   # ---------------------------------------------------------------------------
-  # Coder. Loaded only when the router is confident the task is code, because
-  # swapping models costs ~8 s of visible dead air (see the model.loading event).
-  # Deliberately does NOT advertise `general`: the routing rule picks the
-  # lowest-VRAM capable model, and a coder that claims `general` would win
-  # every plain question and drag chat quality down with it.
+  # Code. Deliberately does NOT advertise `general`: routing picks the
+  # lowest-VRAM capable model, so a 4B claiming `general` would win every plain
+  # question and drag chat quality down with it.
   # ---------------------------------------------------------------------------
-  - id: qwen3-coder-8b
-    path: models/qwen3-coder-8b-q4_k_m.gguf
+  - id: qwen3-4b
+    path: C:/Users/mouli/.ollama/models/blobs/sha256-3e4cb14174460404e7a233e531675303b2fbf7749c02f91864fe311ab6344e4f
     mmproj: null
     capabilities: [code]
     context: 16384
-    vram_mb: 5100
+    vram_mb: 2700
+    default: false
+
+  # ---------------------------------------------------------------------------
+  # Vision. The only model with the `vision` capability, which is what makes
+  # the router's image rule a hard rule rather than a preference. Needs its
+  # multimodal projector alongside the weights. 4096 context: this is a
+  # LLaVA-1.6 vicuna base and does not have more.
+  # ---------------------------------------------------------------------------
+  - id: llava-7b
+    path: C:/Users/mouli/.ollama/models/blobs/sha256-170370233dd5c5415250a2ecd5c71586352850729062ccef1496385647293868
+    mmproj: C:/Users/mouli/.ollama/models/blobs/sha256-72d6f08a42f656d36b356dbe0920675899a99ce21192fd66266fb7d82ed07539
+    capabilities: [vision]
+    context: 4096
+    vram_mb: 4800
     default: false
 
 # Router thresholds. Tune against config/router_trainset.jsonl, not by feel.

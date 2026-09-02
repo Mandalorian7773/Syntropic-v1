@@ -91,19 +91,31 @@ class ModelRegistry:
         return [m for m in self.models if capability in m.capabilities]
 
 
-def _vram_used_mb() -> int | None:
-    """Actual VRAM in use, via nvidia-smi. None when there is no NVIDIA GPU."""
+def _vram_mb() -> tuple[int, int] | None:
+    """(used, total) VRAM in MB via nvidia-smi. None when there is no NVIDIA GPU.
+
+    Total is read, never assumed: the build prompt says 8 GB, but the machine
+    this actually runs on is a 6 GB RTX 4050 Laptop, and a hardcoded budget
+    that lies by 2 GB is how you discover an OOM on stage.
+    """
     smi = shutil.which("nvidia-smi")
     if not smi:
         return None
     try:
         out = subprocess.run(
-            [smi, "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            [smi, "--query-gpu=memory.used,memory.total",
+             "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=5,
         )
-        return int(out.stdout.strip().splitlines()[0])
+        used, total = out.stdout.strip().splitlines()[0].split(",")
+        return int(used), int(total)
     except Exception:
         return None
+
+
+def _vram_used_mb() -> int | None:
+    reading = _vram_mb()
+    return reading[0] if reading else None
 
 
 class ModelManager:
@@ -121,6 +133,12 @@ class ModelManager:
         self._estimate_load_s = estimate_load_s
         self._record_load = record_load
         self._bin = os.getenv("LLAMA_SERVER_BIN", "")
+        # Path to the ggml GPU backend shared library (e.g. ggml-cuda.dll).
+        # ggml only scans the executable's own directory, so a build that keeps
+        # its CUDA backend in a subfolder loads the CPU backend instead and
+        # silently runs at ~1 tok/s. Pointing at the library explicitly is the
+        # difference between 1 and 30 tokens/sec, with no error either way.
+        self._backend_lib = os.getenv("LLAMA_GGML_BACKEND", "")
         self._proc: subprocess.Popen | None = None
         self._loaded_id: str | None = None
         self._lock = asyncio.Lock()
@@ -135,8 +153,11 @@ class ModelManager:
         return self._loaded_id
 
     def vram_free_mb(self) -> int:
-        used = _vram_used_mb()
-        return max(0, 8192 - used) if used is not None else 0
+        reading = _vram_mb()
+        if reading is None:
+            return 0
+        used, total = reading
+        return max(0, total - used)
 
     async def probe(self) -> bool:
         """Is a llama-server answering at the endpoint right now?"""
@@ -206,12 +227,19 @@ class ModelManager:
             "--cache-type-k", spec.cache_type_k,
             "--cache-type-v", spec.cache_type_v,
         ]
-        if spec.flash_attn:
-            args.append("--flash-attn")
+        # Newer llama.cpp takes --flash-attn on|off|auto. A bare flag makes the
+        # parser swallow whatever follows, which is --mmproj for the vision
+        # model -- so always pass the value explicitly.
+        args += ["--flash-attn", "on" if spec.flash_attn else "off"]
         if spec.mmproj:
             args += ["--mmproj", str(self._model_path(spec.mmproj))]
+        env = os.environ.copy()
+        if self._backend_lib:
+            env["GGML_BACKEND_PATH"] = self._backend_lib
+            # The backend DLL's own dependencies (cublas, cudart) sit beside it.
+            env["PATH"] = str(Path(self._backend_lib).parent) + os.pathsep + env.get("PATH", "")
         self._proc = subprocess.Popen(
-            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env
         )
 
     def _stop_server(self) -> None:
