@@ -31,14 +31,16 @@ models:
   # a wrong route TO the generalist is a slow answer; a wrong route AWAY from
   # it is a wrong answer.
   # ---------------------------------------------------------------------------
-  - id: qwen2.5-7b
-    path: C:/Users/mouli/.ollama/models/blobs/sha256-2bada8a7450677000f678be90653b85d364de7db25eb5ea54136ada5f3933730
-    mmproj: null
-    capabilities: [general, document, data]
-    # 8192, not 16384: the card is a 6 GB RTX 4050, and 4.7 GB of weights plus
-    # a 16k KV cache plus the CUDA context does not fit. Measured, not guessed.
-    context: 8192
-    vram_mb: 5300
+  - id: qwen2.5-vl-7b
+    path: D:/sih/models/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
+    mmproj: D:/sih/models/mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf
+    capabilities: [general, vision, document, data]
+    # 16384 fits after all: measured 5903 MiB of 6141 with q8_0 KV and the
+    # projector resident, on a GPU with nothing else on it. The earlier 8192
+    # was measured while an orphaned Ollama runner held 4653 MiB -- check
+    # `nvidia-smi --query-compute-apps` before trusting any VRAM number here.
+    context: 16384
+    vram_mb: 5903
     default: true
 
   # ---------------------------------------------------------------------------
@@ -46,27 +48,25 @@ models:
   # lowest-VRAM capable model, so a 4B claiming `general` would win every plain
   # question and drag chat quality down with it.
   # ---------------------------------------------------------------------------
-  - id: qwen3-4b
-    path: C:/Users/mouli/.ollama/models/blobs/sha256-3e4cb14174460404e7a233e531675303b2fbf7749c02f91864fe311ab6344e4f
+  - id: qwen2.5-coder-7b
+    path: D:/sih/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf
     mmproj: null
     capabilities: [code]
     context: 16384
-    vram_mb: 2700
+    vram_mb: 4895
     default: false
 
   # ---------------------------------------------------------------------------
-  # Vision. The only model with the `vision` capability, which is what makes
-  # the router's image rule a hard rule rather than a preference. Needs its
-  # multimodal projector alongside the weights. 4096 context: this is a
-  # LLaVA-1.6 vicuna base and does not have more.
+  # No separate vision model. qwen2.5-vl-7b above carries `vision`, so the
+  # router's image rule still has exactly one model to land on -- with 16384
+  # context instead of LLaVA-1.6's 4096, which matters for a scanned report.
+  #
+  # The retired llava-7b and the two Ollama blobs it shared a store with are
+  # NOT interchangeable with these: under grammar-constrained decoding the
+  # Ollama qwen2.5-7b blob emits HTML-template junk ('><!-- Template ...')
+  # where the official GGUF emits {"final": "391"}. Same llama.cpp binary,
+  # same grammar, same prompt. Weights from models/MANIFEST.yaml only.
   # ---------------------------------------------------------------------------
-  - id: llava-7b
-    path: C:/Users/mouli/.ollama/models/blobs/sha256-170370233dd5c5415250a2ecd5c71586352850729062ccef1496385647293868
-    mmproj: C:/Users/mouli/.ollama/models/blobs/sha256-72d6f08a42f656d36b356dbe0920675899a99ce21192fd66266fb7d82ed07539
-    capabilities: [vision]
-    context: 4096
-    vram_mb: 4800
-    default: false
 
 # Router thresholds. Tune against config/router_trainset.jsonl, not by feel.
 router:

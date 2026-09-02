@@ -44,6 +44,27 @@ class Response(BaseModel):
     tokens_out: int = 0
 
 
+def _final_text(args: Any) -> str:
+    """Answer text out of a {"tool":"final","args":...} payload.
+
+    The args are whatever the model felt like: a bare string, {"answer": ...},
+    or the answer spread across fields such as
+    {"set_pressure": "12.5 barg", "page": 1, "filename": "SOP-INSP-014.pdf"}.
+    The last case is why this does not just pick a key -- dropping the other
+    fields would throw away the citation the user asked for.
+    """
+    if isinstance(args, str):
+        return args
+    if not isinstance(args, dict):
+        return "" if args is None else str(args)
+    for key in ("answer", "final", "text", "content", "response"):
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    parts = [f"{k}: {v}" for k, v in args.items() if v is not None]
+    return "; ".join(parts)
+
+
 class LLMClient:
     def __init__(self, manager: ModelManager, timeout_s: float = 300.0) -> None:
         self._manager = manager
@@ -150,6 +171,14 @@ class LLMClient:
             return Response(text=raw, raw=raw, is_final=True, malformed=True,
                             tokens_in=tokens_in, tokens_out=tokens_out)
         if isinstance(obj, dict) and "tool" in obj:
+            # {"tool":"final","args":{...}} is the model finishing in the tool
+            # shape rather than the final shape. Both mean "done"; treating the
+            # first as a call to a tool named `final` sends the loop round again
+            # and it eventually trips LOOP_DETECTED with the answer in hand.
+            if str(obj["tool"]).lower() == "final":
+                return Response(text=_final_text(obj.get("args")), raw=raw,
+                                is_final=True,
+                                tokens_in=tokens_in, tokens_out=tokens_out)
             call = ParsedToolCall(
                 call_id=f"c{uuid.uuid4().hex[:8]}",
                 name=str(obj["tool"]),

@@ -72,16 +72,64 @@ async def test_tool_then_final(ws, registry, store, audit):
 
 
 async def test_loop_detection_aborts(ws, registry, store, audit):
+    """Repeating a call that SUCCEEDED is a loop: the answer is already there.
+
+    list_files, not read_file, because a repeat of a *failed* call is the
+    documented retry path and is exempt -- see the ok=False test below.
+    """
     store.ensure_session("s1")
-    same = {"path": "x.txt"}
+    same = {"path": "."}
     llm = FakeLLM([
-        tool_call("read_file", same),
-        tool_call("read_file", same),   # identical, consecutively -> abort
+        tool_call("list_files", same),
+        tool_call("list_files", same),   # 1st repeat -> nudged, not fatal
+        tool_call("list_files", same),   # 2nd repeat -> abort
     ])
     events = await collect(make_loop(llm, registry, store, audit, ws))
     errors = [e for e in events if e.type == "error"]
     assert errors and errors[0].code == "LOOP_DETECTED"
     assert events[-1].stop_reason == "error"
+
+
+async def test_single_repeat_is_nudged_not_fatal(ws, registry, store, audit):
+    """One repeated call must not end the run.
+
+    At the temperature the loop actually samples at, the same context was
+    measured emitting a duplicate call on one sample and the correct final
+    answer on the next. Aborting on the first repeat threw away runs that had
+    the answer already in context -- which is what killed the retrieval demo.
+    """
+    store.ensure_session("s1")
+    same = {"path": "."}
+    llm = FakeLLM([
+        tool_call("list_files", same),
+        tool_call("list_files", same),   # identical -> corrected, run continues
+        final("The answer is 12.5 barg."),
+    ])
+    events = await collect(make_loop(llm, registry, store, audit, ws))
+    assert [e for e in events if e.type == "error"] == []
+    assert events[-1].stop_reason == "final_answer"
+    # The correction is fed back as a message, so the model can see why.
+    assert any("Do not repeat it" in r["messages"][-1]["content"]
+               for r in llm.requests if r["messages"])
+
+
+async def test_repeat_of_failed_call_is_not_a_loop(ws, registry, store, audit):
+    """A failed call may be retried verbatim; only MAX_TOOL_RETRIES bounds it.
+
+    This is the case that made a dead Docker daemon look like a wedged model:
+    execute_python failed every time, the model reissued it, and the run was
+    reported as LOOP_DETECTED rather than as the tool being unavailable.
+    """
+    store.ensure_session("s1")
+    same = {"path": "does-not-exist.txt"}    # read_file fails -> ok=False
+    llm = FakeLLM([
+        tool_call("read_file", same),
+        tool_call("read_file", same),
+        final("Gave up on the file and answered anyway."),
+    ])
+    events = await collect(make_loop(llm, registry, store, audit, ws))
+    assert [e.code for e in events if e.type == "error"] == []
+    assert events[-1].stop_reason == "final_answer"
 
 
 async def test_retry_cap_honest_stop(ws, registry, store, audit):

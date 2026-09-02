@@ -35,8 +35,19 @@ def build_grammar(tool_names: list[str]) -> str:
         )
     name_alts = " | ".join(f'"\\"{name}\\""' for name in tool_names)
     return (
-        "root ::= toolcall | final\n"
+        "root ::= toolcall | final | finaltool\n"
         'final ::= "{" ws "\\"final\\"" ws ":" ws string ws "}"\n'
+        # A 7B model told "use {"tool":...} for tools" generalises the shape and
+        # tries to finish with {"tool":"final","args":{...}}. Without this rule
+        # `final` is not a legal toolname, so the intended answer is literally
+        # unutterable and the constrained decoder falls back to the next legal
+        # path -- which is re-emitting the previous tool call. That looks like
+        # the model looping; it is the grammar refusing to let it stop.
+        # Observed on qwen2.5-vl-7b: ungrammared it emits
+        #   {"tool":"final","args":{"set_pressure":"12.5 barg","page":1}}
+        # and grammared it repeats search_documents until LOOP_DETECTED fires.
+        'finaltool ::= "{" ws "\\"tool\\"" ws ":" ws "\\"final\\"" ws "," ws '
+        '"\\"args\\"" ws ":" ws object ws "}"\n'
         'toolcall ::= "{" ws "\\"tool\\"" ws ":" ws toolname ws "," ws '
         '"\\"args\\"" ws ":" ws object ws "}"\n'
         f"toolname ::= {name_alts}\n"

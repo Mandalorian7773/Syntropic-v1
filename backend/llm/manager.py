@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -172,6 +173,11 @@ class ModelManager:
         """Establish what is resident. External mode: whatever answers is the
         default model by definition, since compose starts exactly one."""
         if self.managed:
+            # A server answering before we have started anything is an orphan
+            # from a killed run, and it owns the GPU we are about to need.
+            if await self.probe():
+                self._reap_orphan_server()
+                await self._wait_port_free()
             await self.ensure(self.registry.default.id, emit=None)
         elif await self.probe():
             self._loaded_id = self.registry.default.id
@@ -258,6 +264,47 @@ class ModelManager:
                 self._proc.kill()
                 self._proc.wait(timeout=5)
         self._proc = None
+
+    def _reap_orphan_server(self) -> int | None:
+        """Kill a llama-server we did not start that is squatting our port.
+
+        If uvicorn is killed rather than shut down, the FastAPI shutdown hook
+        never runs and the child llama-server survives holding the entire VRAM
+        budget -- the next start then cannot fit a model and fails for a reason
+        that looks nothing like the cause. Reclaim it instead of starving.
+        """
+        pid = self._pid_on_port()
+        if pid is None:
+            return None
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                               capture_output=True, timeout=10)
+            else:
+                os.kill(pid, signal.SIGKILL)
+        except Exception:
+            return None
+        return pid
+
+    def _pid_on_port(self) -> int | None:
+        """PID listening on the model endpoint's port, or None."""
+        try:
+            if os.name == "nt":
+                out = subprocess.run(["netstat", "-ano"], capture_output=True,
+                                     text=True, timeout=10).stdout
+                for line in out.splitlines():
+                    parts = line.split()
+                    if (len(parts) >= 5 and "LISTENING" in parts
+                            and parts[1].endswith(f":{self._port}")):
+                        return int(parts[-1])
+            else:
+                out = subprocess.run(["lsof", "-ti", f"tcp:{self._port}"],
+                                     capture_output=True, text=True, timeout=10).stdout
+                if out.strip():
+                    return int(out.strip().splitlines()[0])
+        except Exception:
+            return None
+        return None
 
     async def _wait_port_free(self, timeout_s: int = 30) -> None:
         """Block until nothing answers on the endpoint, so the replacement

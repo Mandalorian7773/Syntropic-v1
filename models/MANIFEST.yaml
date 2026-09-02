@@ -17,27 +17,38 @@
 schema_version: 1
 
 models:
+  # Verified 2026-09-03 against the Hugging Face API, downloaded, and hashed on
+  # this machine. ggml-org is llama.cpp's own org: the mmproj below is from the
+  # SAME build as the weights, which is the only way to be sure vision is not
+  # silently producing garbage. Vision path was tested end to end (model read
+  # known text off a PNG correctly) before these hashes were recorded.
   - id: qwen2.5-vl-7b
-    repo: PLACEHOLDER/Qwen2.5-VL-7B-Instruct-GGUF
-    filename: PLACEHOLDER-qwen2.5-vl-7b-instruct-q4_k_m.gguf
+    repo: ggml-org/Qwen2.5-VL-7B-Instruct-GGUF
+    filename: Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
     quant: Q4_K_M
-    size_bytes: 0
-    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    size_bytes: 4683072032
+    sha256: "9258bf05b12686d097ff3b6b18d968ab393649780aa2b3cd67fec43d50554392"
     role: vision-generalist
 
-  - id: qwen3-coder-8b
-    repo: PLACEHOLDER/Qwen3-Coder-8B-GGUF
-    filename: PLACEHOLDER-qwen3-coder-8b-q4_k_m.gguf
+  # NOT qwen3-coder-8b. Qwen never released a Qwen3-Coder at 8B -- the smallest
+  # Qwen3-Coder is 30B-A3B (~18 GB at Q4, needs --cpu-moe and 32 GB system RAM).
+  # Confirmed against the HF search API: no such repo exists to point at. This
+  # is the official Qwen GGUF build of the 7B coder instead.
+  - id: qwen2.5-coder-7b
+    repo: Qwen/Qwen2.5-Coder-7B-Instruct-GGUF
+    filename: qwen2.5-coder-7b-instruct-q4_k_m.gguf
     quant: Q4_K_M
-    size_bytes: 0
-    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    size_bytes: 4683073536
+    sha256: "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c"
     role: coder
 
   # The vision model also needs its multimodal projector. Same rules apply.
+  # Q8_0, not F16: ggml-org ships both, and Q8_0 saves 500 MB of VRAM on a card
+  # where the VL model already peaks at 5903 MiB of 6141.
   - id: qwen2.5-vl-7b-mmproj
-    repo: PLACEHOLDER/Qwen2.5-VL-7B-Instruct-GGUF
-    filename: PLACEHOLDER-mmproj-f16.gguf
-    quant: F16
-    size_bytes: 0
-    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    repo: ggml-org/Qwen2.5-VL-7B-Instruct-GGUF
+    filename: mmproj-Qwen2.5-VL-7B-Instruct-Q8_0.gguf
+    quant: Q8_0
+    size_bytes: 853119712
+    sha256: "2ddb555391bae966e412deab9e07b58afa18bcc06930ba0f1c78a3695ab9e506"
     role: mmproj

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import mimetypes
 import os
 import time
@@ -31,7 +32,9 @@ import uuid
 from pathlib import Path
 from typing import AsyncIterator
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+
+log = logging.getLogger(__name__)
 
 from contracts import (
     AgentError,
@@ -54,6 +57,10 @@ from tools.registry import Registry
 
 MAX_STEPS = int(os.getenv("MAX_STEPS", "10"))
 MAX_TOOL_RETRIES = 3
+# Consecutive identical tool calls tolerated, each answered with a corrective
+# message, before LOOP_DETECTED aborts. 1 is enough: the failure this fixes is
+# a single unlucky sample, not a model that has genuinely wedged.
+MAX_LOOP_NUDGES = 1
 CONTEXT_COMPACT_THRESHOLD = 0.75
 TOKEN_CHUNK_CHARS = 48
 
@@ -126,6 +133,8 @@ class AgentLoop:
             swap_events.append(event)
 
         recent_calls: list[tuple[str, str]] = []   # (name, canonical args) history
+        nudges = 0                                 # consecutive repeats corrected
+        last_failed: dict[tuple[str, str], bool] = {}   # signature -> last run failed
         fail_streak: dict[str, int] = {}
         tokens_in = tokens_out = 0
         steps_used = 0
@@ -187,14 +196,41 @@ class AgentLoop:
 
             call = resp.tool_calls[0]
             signature = (call.name, json.dumps(call.args, sort_keys=True))
-            if signature in recent_calls[-2:]:
-                yield audited(AgentError(
-                    code="LOOP_DETECTED",
-                    message=f"{call.name} repeated with identical arguments; aborting",
-                    recoverable=False,
-                ))
-                yield await finish("error")
-                return
+            # Retrying a call that FAILED is not a loop, it is the documented
+            # recovery path -- execute_python is expected to fail, get its
+            # stderr back, and be re-run. Only MAX_TOOL_RETRIES bounds that.
+            # Counting those as loops made a broken sandbox (docker engine
+            # down: 38 of 43 execute_python calls failing) surface as
+            # LOOP_DETECTED, which points the blame at the model instead of
+            # at the daemon that is actually down.
+            if signature in recent_calls[-2:] and not last_failed.get(signature):
+                # A repeat is not automatically a wedged model. At the sampling
+                # temperature the loop actually uses, the same step-2 context
+                # was measured emitting search_documents, then read_document,
+                # then the correct final answer on three identical calls. That
+                # first sample is the one this used to abort on -- with the
+                # answer already in context. So: nudge once, abort on the
+                # second consecutive repeat. Retries stay bounded either way.
+                nudges += 1
+                if nudges > MAX_LOOP_NUDGES:
+                    yield audited(AgentError(
+                        code="LOOP_DETECTED",
+                        message=f"{call.name} repeated with identical arguments "
+                                f"after {MAX_LOOP_NUDGES} nudge(s); aborting",
+                        recoverable=False,
+                    ))
+                    yield await finish("error")
+                    return
+                self._audit.record("agent.loop_nudge",
+                                   {"step": steps_used, "tool": call.name}, session_id)
+                messages.append({"role": "assistant", "content": resp.raw})
+                messages.append({"role": "user", "content":
+                    f"You already called {call.name} with exactly those arguments "
+                    f"and its observation is above. Do not repeat it. Either answer "
+                    f'now with {{"final": "<your answer>"}}, or call a different '
+                    f"tool, or call the same tool with different arguments."})
+                continue
+            nudges = 0
             recent_calls.append(signature)
 
             # Persist the call before executing it -- if execution wedges the
@@ -221,6 +257,7 @@ class AgentLoop:
             for event in self._artifacts_from(session_id, result):
                 yield audited(event)
 
+            last_failed[signature] = not result.ok
             if result.ok:
                 fail_streak[call.name] = 0
             else:
@@ -235,10 +272,30 @@ class AgentLoop:
                     yield await finish("error")
                     return
 
+            # A tool whose content is itself JSON (search_documents returns
+            # {"hits": [...]}) must be embedded as structure, not as a string.
+            # Nesting it doubles every quote: measured on one real result,
+            # 2683 chars and 100 backslashes nested vs 2600 and 19 parsed. The
+            # model then has to read \"doc_id\" through the escaping and still
+            # emit a grammar-constrained call.
+            # AGENT_UNNEST_OBS=on embeds a tool's JSON content as structure
+            # rather than as a nested string. It reads better -- one real
+            # search_documents result is 2683 chars and 100 backslashes nested
+            # against 2600 and 19 parsed -- but it measured WORSE end to end
+            # (5/15 vs 8/15 completions; the retrieval prompt went 3/3 to 0/3),
+            # so the default stays off. Kept as a flag because that measurement
+            # was taken while the Docker sandbox was down and every
+            # execute_python failed; it deserves a rerun on a healthy stack.
+            content = result.content
+            if os.getenv("AGENT_UNNEST_OBS", "off").lower() == "on":
+                try:
+                    content = json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    pass
             observation = json.dumps({
                 "tool": call.name,
                 "ok": result.ok,
-                "content": result.content,
+                "content": content,
                 "error": result.error,
             })
             messages.append({"role": "assistant", "content": resp.raw})
@@ -251,16 +308,44 @@ class AgentLoop:
 
     def _citations_from(self, call: ParsedToolCall, result) -> list[Citation]:
         """search_documents returns its hits as JSON; surface them as citation
-        events so the UI can pin sources. Anything unparseable is ignored."""
+        events so the UI can pin sources. Anything unparseable is ignored.
+
+        ragsvc currently returns `content` as a human-formatted string
+        ("1. [file.pdf p.1] - snippet"), which carries neither doc_id nor
+        score -- both required by the Citation contract. Parsing that string
+        would mean inventing a doc_id, and the UI pins sources by doc_id, so a
+        fabricated one is worse than no citation: it looks like it works. This
+        stays strict on purpose; ragsvc needs to send `{"hits": [...]}` with
+        doc_id and score per hit. When it does, this fires with no further
+        change here -- see _log_citation_gap for the warning that says so.
+        """
         if call.name != "search_documents" or not result.ok:
             return []
         try:
             hits = json.loads(result.content).get("hits", [])
-            return [Citation(**{k: h[k] for k in
-                                ("doc_id", "filename", "page", "score", "snippet")})
-                    for h in hits[:5]]
-        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            self._log_citation_gap(result)
             return []
+        out = []
+        for h in hits[:5]:
+            try:
+                out.append(Citation(**{k: h[k] for k in
+                                       ("doc_id", "filename", "page",
+                                        "score", "snippet")}))
+            except (KeyError, TypeError, ValidationError):
+                self._log_citation_gap(result)
+        return out
+
+    @staticmethod
+    def _log_citation_gap(result) -> None:
+        """One loud line, not a silent empty list. A retrieval demo that shows
+        no citation panel is the failure this is meant to make obvious."""
+        log.warning(
+            "search_documents returned content that carries no citable hits, "
+            "so zero citation events were emitted. Expected JSON "
+            '{"hits":[{"doc_id","filename","page","score","snippet"}]}; got %r',
+            (result.content or "")[:160],
+        )
 
     def _artifacts_from(self, session_id: str, result) -> list[Artifact]:
         events = []
