@@ -38,7 +38,9 @@ class ExecArgs(BaseModel):
 
 class ExecutePythonTool(Tool):
     name = "execute_python"
-    description = "Run Python code in an offline sandbox; returns stdout, stderr, exit code."
+    # A bare expression returns nothing observable, and a 7B model that gets
+    # back "exit code: 0" with no stdout will invent an answer. Say print().
+    description = "Run Python in an offline sandbox; you must print() any value you want returned."
     args_model = ExecArgs
 
     def run(self, args: ExecArgs, ctx: RunContext) -> ToolResult:
@@ -126,6 +128,11 @@ class ExecutePythonTool(Tool):
         content = f"exit code: {exit_code}\n"
         if stdout:
             content += f"--- stdout ---\n{stdout}\n"
+        elif exit_code == 0:
+            # Silence on success is the trap: without this line the model reads
+            # "exit code: 0" as "my answer is confirmed" and fabricates one.
+            content += ("--- stdout ---\n(empty: the script printed nothing. "
+                        "Re-run with print() around the value you need.)\n")
         if stderr:
             content += f"--- stderr ---\n{stderr}\n"
         if produced:

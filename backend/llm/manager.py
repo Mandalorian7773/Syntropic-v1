@@ -200,6 +200,13 @@ class ModelManager:
             started = time.monotonic()
             self._stop_server()
             self._loaded_id = None
+            # The dying server keeps answering /health for a moment after
+            # terminate(). Starting the replacement while the old one still
+            # holds :8080 makes the very next probe() succeed against a corpse:
+            # we declare ready in ~1 s, then the first completion 404s because
+            # nothing is actually serving the new weights. Wait for the port to
+            # go quiet before spawning.
+            await self._wait_port_free()
             self._start_server(spec)
             await self._wait_healthy(spec)
             load_ms = int((time.monotonic() - started) * 1000)
@@ -251,6 +258,15 @@ class ModelManager:
                 self._proc.kill()
                 self._proc.wait(timeout=5)
         self._proc = None
+
+    async def _wait_port_free(self, timeout_s: int = 30) -> None:
+        """Block until nothing answers on the endpoint, so the replacement
+        server cannot be confused with the one it is replacing."""
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if not await self.probe():
+                return
+            await asyncio.sleep(0.25)
 
     async def _wait_healthy(self, spec: ModelSpec, timeout_s: int = 120) -> None:
         deadline = time.monotonic() + timeout_s
