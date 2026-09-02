@@ -122,7 +122,19 @@ function Step({ step, index }: { step: TraceStep; index: number }) {
 }
 
 function Status({ step }: { step: TraceStep }) {
-  if (step.ok === null) return <LiveDuration startedAt={step.startedAt} />;
+  // Still running: no verdict and no frozen duration yet.
+  if (step.ok === null && step.durationMs === null) {
+    return <LiveDuration startedAt={step.startedAt} />;
+  }
+  // Frozen but never resolved -- the run ended under it.
+  if (step.ok === null) {
+    return (
+      <span className="shrink-0 font-mono text-tiny tabular-nums text-steel-500">
+        {step.durationMs !== null ? ms(step.durationMs) : ''}
+        <span className="ml-1.5 text-steel-600">abandoned</span>
+      </span>
+    );
+  }
   return (
     <span className="flex shrink-0 items-baseline gap-1.5 font-mono text-tiny
                      tabular-nums">
