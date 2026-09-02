@@ -15,6 +15,7 @@ Startup order matters and is deliberate:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import os
@@ -319,9 +320,14 @@ async def health() -> HealthResponse:
             qdrant_ok = (await client.get(f"{QDRANT_URL}/readyz")).status_code == 200
     except httpx.HTTPError:
         pass
+    # to_thread, not a direct call: vram_free_mb() shells out to nvidia-smi.
+    # Even cached, the first read after the TTL expires would block the event
+    # loop -- and this handler is polled by every open frontend tab, so that
+    # block lands in the middle of somebody's SSE token stream.
+    vram_free = await asyncio.to_thread(manager.vram_free_mb)
     return HealthResponse(
         ok=True, model_loaded=manager.loaded_id,
-        qdrant=qdrant_ok, vram_free_mb=manager.vram_free_mb(),
+        qdrant=qdrant_ok, vram_free_mb=vram_free,
     )
 
 

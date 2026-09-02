@@ -45,6 +45,37 @@ def truncate_content(content: str, ctx: RunContext, name: str) -> tuple[str, str
     return f"{kept}\n[truncated; full output at {raw_path}]", str(raw_path)
 
 
+_SCALARS = {"string": str, "integer": int, "number": float, "boolean": bool}
+
+
+def _python_type(schema: dict) -> Any:
+    """JSON Schema property -> Python type for the generated args model.
+
+    `anyOf` has to be handled, not defaulted past. ragsvc declares
+    read_document's `pages` as {"anyOf": [{"type": "array", "items":
+    {"type": "integer"}}, {"type": "null"}]}, which carries no top-level
+    "type" -- so a `schema.get("type", "string")` silently types it `str`,
+    the model correctly sends [1], and Pydantic rejects it with "Input should
+    be a valid string". The tool then fails every time with args that were
+    right all along, and the agent burns its retries on a phantom.
+    """
+    if "anyOf" in schema:
+        for branch in schema["anyOf"]:
+            if branch.get("type") != "null":
+                return _python_type(branch)
+        return Any
+    kind = schema.get("type")
+    if kind == "array":
+        return list[_python_type(schema.get("items", {}))]
+    if kind == "object":
+        return dict
+    if kind is None:
+        # No type at all: accept whatever the model sends rather than
+        # inventing a constraint ragsvc never declared.
+        return Any
+    return _SCALARS.get(kind, str)
+
+
 class RemoteTool(Tool):
     """A tool that lives in ragsvc. Same contract, executed over HTTP."""
 
@@ -52,15 +83,13 @@ class RemoteTool(Tool):
     description = "placeholder"
     args_model: Type[BaseModel] = BaseModel
 
-    def __init__(self, endpoint: str, spec: dict) -> None:
+    def __init__(self, endpoint: str, spec: dict) -> None:  # noqa: D107
         self.endpoint = endpoint.rstrip("/")
         self.name = spec["name"]
         self.description = spec["description"]
         fields: dict[str, Any] = {}
         for prop, schema in spec.get("parameters", {}).get("properties", {}).items():
-            py = {"string": str, "integer": int, "number": float, "boolean": bool}.get(
-                schema.get("type", "string"), str
-            )
+            py = _python_type(schema)
             required = prop in spec.get("parameters", {}).get("required", [])
             fields[prop] = (py, ... if required else None)
         self.args_model = create_model(f"{self.name}_args", **fields)

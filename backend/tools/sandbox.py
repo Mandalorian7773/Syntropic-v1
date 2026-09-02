@@ -36,6 +36,56 @@ class ExecArgs(BaseModel):
     code: str
 
 
+def _docker_client(docker, DockerException):
+    """A Docker client that follows Docker Desktop's context, not just the env.
+
+    `docker.from_env()` does NOT read `docker context`. With DOCKER_HOST unset
+    it goes to the *default* context's endpoint, npipe:////./pipe/docker_engine
+    -- but Docker Desktop's active context is `desktop-linux`, serving
+    npipe:////./pipe/dockerDesktopLinuxEngine. So `docker ps` works on the
+    command line while the SDK reports "CreateFile: the system cannot find the
+    file specified", which reads exactly like a stopped daemon and sent us
+    chasing four phantom engine crashes.
+
+    Explicit DOCKER_HOST still wins; the fallbacks only run if the default
+    endpoint is unreachable.
+    """
+    try:
+        return docker.from_env()
+    except DockerException:
+        if os.getenv("DOCKER_HOST"):
+            raise            # user asked for a specific endpoint; do not guess
+    last: Exception | None = None
+    for url in ("npipe:////./pipe/dockerDesktopLinuxEngine",
+                "npipe:////./pipe/docker_engine",
+                "unix:///var/run/docker.sock"):
+        try:
+            client = docker.DockerClient(base_url=url)
+            client.ping()
+            return client
+        except Exception as exc:      # noqa: BLE001 - any failure means try next
+            last = exc
+    raise DockerException(last)
+
+
+def _denature_escapes(code: str) -> str:
+    r"""Turn a literal two-character \n back into a newline.
+
+    Under grammar-constrained decoding the model double-escapes: the JSON
+    string arrives holding backslash-n rather than a newline, so the script on
+    disk is one line reading `def f(a, b):\n    return a + b` and Python stops
+    at `SyntaxError: unexpected character after line continuation character`.
+    The model cannot see why -- it re-sends the same code and burns its retries.
+
+    Only rewritten when the code has NO real newlines but does contain the
+    literal sequence, which is exactly the broken case. Multi-line code that
+    legitimately contains "\\n" inside a string is left alone.
+    """
+    if "\n" in code or "\\n" not in code:
+        return code
+    return code.replace("\\n", "\n").replace("\\t", "\t")
+
+
 class ExecutePythonTool(Tool):
     name = "execute_python"
     # A bare expression returns nothing observable, and a 7B model that gets
@@ -64,7 +114,7 @@ class ExecutePythonTool(Tool):
         run_id = uuid.uuid4().hex[:12]
         run_dir = Path(ctx.workspace_dir) / ".runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "script.py").write_text(args.code, encoding="utf-8")
+        (run_dir / "script.py").write_text(_denature_escapes(args.code), encoding="utf-8")
 
         host_workspace = os.getenv("SANDBOX_HOST_WORKSPACE", "")
         if host_workspace:
@@ -73,9 +123,20 @@ class ExecutePythonTool(Tool):
             host_run_dir = str(run_dir.resolve())
 
         try:
-            client = docker.from_env()
+            client = _docker_client(docker, DockerException)
         except DockerException as exc:
-            return done(False, "", f"docker unavailable: {exc}")
+            # Actionable, not just the raw errno. This message goes into the
+            # model's context, and "CreateFile: the system cannot find the file
+            # specified" tells it nothing it can act on -- it just re-runs the
+            # same code until MAX_TOOL_RETRIES and the run dies reporting a
+            # wedged agent instead of a stopped daemon.
+            return done(
+                False, "",
+                f"sandbox unavailable: the Docker engine is not reachable, so no "
+                f"code can run right now. This is a host problem, not a problem "
+                f"with your code -- do not retry execute_python; answer without "
+                f"it or say you cannot. ({exc})",
+            )
 
         container = None
         try:

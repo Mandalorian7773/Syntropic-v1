@@ -92,15 +92,35 @@ class ModelRegistry:
         return [m for m in self.models if capability in m.capabilities]
 
 
-def _vram_mb() -> tuple[int, int] | None:
+# nvidia-smi costs ~1-2 s per invocation on this machine. /api/health calls it,
+# /api/health is polled by every open frontend tab, and the handler is `async` --
+# so each poll blocked the event loop for a second or more and the SSE token
+# stream visibly stalled. Two tabs open reads on stage as "the model is stuck
+# thinking". A short cache makes the reading cheap; VRAM does not move between
+# polls anyway, and every path that actually cares about a fresh number (a load
+# or an evict) calls _vram_mb(fresh=True).
+_VRAM_TTL_S = 5.0
+_vram_cache: tuple[float, tuple[int, int] | None] | None = None
+
+
+def _vram_mb(fresh: bool = False) -> tuple[int, int] | None:
     """(used, total) VRAM in MB via nvidia-smi. None when there is no NVIDIA GPU.
 
     Total is read, never assumed: the build prompt says 8 GB, but the machine
     this actually runs on is a 6 GB RTX 4050 Laptop, and a hardcoded budget
     that lies by 2 GB is how you discover an OOM on stage.
+
+    Cached for _VRAM_TTL_S; pass fresh=True around load/evict decisions.
     """
+    global _vram_cache
+    if not fresh and _vram_cache is not None:
+        stamp, cached = _vram_cache
+        if time.monotonic() - stamp < _VRAM_TTL_S:
+            return cached
+
     smi = shutil.which("nvidia-smi")
     if not smi:
+        _vram_cache = (time.monotonic(), None)
         return None
     try:
         out = subprocess.run(
@@ -109,13 +129,17 @@ def _vram_mb() -> tuple[int, int] | None:
             capture_output=True, text=True, timeout=5,
         )
         used, total = out.stdout.strip().splitlines()[0].split(",")
-        return int(used), int(total)
+        reading = (int(used), int(total))
     except Exception:
-        return None
+        reading = None
+    _vram_cache = (time.monotonic(), reading)
+    return reading
 
 
 def _vram_used_mb() -> int | None:
-    reading = _vram_mb()
+    # fresh: this is the number reported in model.ready right after a load, so
+    # a five-second-old reading would show the PREVIOUS model's footprint.
+    reading = _vram_mb(fresh=True)
     return reading[0] if reading else None
 
 

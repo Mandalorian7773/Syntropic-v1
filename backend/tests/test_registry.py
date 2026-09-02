@@ -98,3 +98,45 @@ def test_prompt_block_lists_all_tools():
     r.register(make_tool("beta_tool"))
     block = r.prompt_block()
     assert "alpha_tool" in block and "beta_tool" in block
+
+
+def test_remote_tool_honours_anyof_array_schema():
+    """A ragsvc `anyOf` schema must not collapse to `str`.
+
+    read_document declares pages as {"anyOf": [{"type":"array","items":
+    {"type":"integer"}}, {"type":"null"}]}. Defaulting past anyOf typed it
+    `str`, so the model's correct `pages: [1]` was rejected as "Input should
+    be a valid string" and the tool failed every single call.
+    """
+    from tools.registry import RemoteTool
+
+    spec = {
+        "name": "read_document",
+        "description": "Read a document.",
+        "parameters": {
+            "properties": {
+                "file_id": {"type": "string"},
+                "pages": {"anyOf": [{"items": {"type": "integer"},
+                                     "type": "array"}, {"type": "null"}]},
+            },
+            "required": ["file_id"],
+        },
+    }
+    tool = RemoteTool("http://ragsvc.invalid", spec)
+    parsed = tool.args_model(file_id="d1", pages=[1, 2])
+    assert parsed.pages == [1, 2]
+    # Omitted stays optional, and a bare id still works.
+    assert tool.args_model(file_id="d1").pages is None
+
+
+def test_remote_tool_untyped_property_accepts_anything():
+    from tools.registry import RemoteTool
+
+    spec = {
+        "name": "loose_tool",
+        "description": "Anything goes.",
+        "parameters": {"properties": {"blob": {}}, "required": []},
+    }
+    tool = RemoteTool("http://ragsvc.invalid", spec)
+    assert tool.args_model(blob={"a": 1}).blob == {"a": 1}
+    assert tool.args_model(blob="text").blob == "text"

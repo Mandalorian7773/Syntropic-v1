@@ -25,6 +25,9 @@ offline-bundle/
 __pycache__/
 *.py[cod]
 .venv/
+# ragsvc runs on 3.11: rapidocr-onnxruntime caps at Python <3.13 and the
+# root .venv is 3.13. Second venv, same reason it must never be committed.
+.venv311/
 *.egg-info/
 .pytest_cache/
 build/

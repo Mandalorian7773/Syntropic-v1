@@ -75,6 +75,17 @@ object and nothing else, in one of two shapes:
 Available tools:
 {tools}
 
+Choosing a tool:
+- Any question about plant documents -- procedures, SOPs, inspection or
+  incident reports, drawings, quotations, or an equipment tag such as
+  PSV-2103 or V-1201 -- starts with search_documents. That is the only way
+  to reach the ingested corpus.
+- read_file, write_file and list_files see ONLY the scratch workspace, which
+  starts empty. They cannot open an ingested document. Reaching for read_file
+  to answer a question about a report will always fail.
+- execute_python runs a real offline sandbox. Write the code as real source
+  with real newlines and print() what you want back.
+
 Rules: one tool per step. Read a tool's observation before deciding the next
 step. If a tool fails, fix your input and try again. When you have enough to
 answer, emit the final object -- do not call a tool you have already called
