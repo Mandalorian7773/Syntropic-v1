@@ -1,6 +1,6 @@
 """BGE-M3 dense embeddings, ONNX int8, CPU. Owner: person 2.
 
-CPU is the design, not a fallback. All 8 GB of VRAM belongs to the resident
+CPU is the design, not a fallback. All 6 GB of VRAM belongs to the resident
 LLM; an embedding model that shares it evicts the LLM, and an eviction costs
 about 8 seconds per query. See docs/decisions/0005-cpu-embeddings.md.
 

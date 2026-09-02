@@ -3,6 +3,13 @@ models/*.gguf
 models/*.onnx
 models/*.bin
 models/*.safetensors
+# The four patterns above only match files sitting directly in models/.
+# scripts/fetch-rag-models.py puts each model in its own subdirectory, so
+# without these two lines a 542 MB ONNX graph slips past the ignore and into a
+# commit that GitHub then refuses -- its hard limit is 100 MB per file.
+models/**/*.onnx
+models/**/*.gguf
+models/**/tokenizer.json
 
 # Runtime state
 workspace/
@@ -32,3 +39,6 @@ dist/
 
 # NOTE: bench/results/ is deliberately NOT ignored. Those files are committed
 # evidence that the system got faster. Do not add them here.
+
+# Dev server logs from `make dev-*` / uvicorn redirects.
+*.log

@@ -67,7 +67,15 @@ CREATE TABLE IF NOT EXISTS chunks (
 
 CREATE INDEX IF NOT EXISTS chunks_by_doc ON chunks (doc_id, chunk_index);
 
-CREATE TABLE IF NOT EXISTS artifacts (
+-- rag_artifacts, not artifacts. backend/db/schema.sql creates its own
+-- `artifacts` table in this same database file, with different columns and a
+-- NOT NULL foreign key to sessions. Both use CREATE TABLE IF NOT EXISTS, so
+-- whichever service starts first wins and the other writes against a shape it
+-- does not expect -- silently, until an INSERT hits a missing column. Person 3
+-- owns `artifacts` because it backs /api/artifacts; this table is ragsvc's own
+-- record of what it generated, including the template and title that their
+-- schema has no room for.
+CREATE TABLE IF NOT EXISTS rag_artifacts (
     artifact_id TEXT PRIMARY KEY,
     filename    TEXT NOT NULL,
     path        TEXT NOT NULL,
@@ -305,7 +313,7 @@ def insert_artifact(
     with transaction() as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO artifacts
+            INSERT OR REPLACE INTO rag_artifacts
                 (artifact_id, filename, path, mime, size_bytes, template, title,
                  session_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -326,13 +334,13 @@ def insert_artifact(
 
 def get_artifact(artifact_id: str) -> dict[str, Any] | None:
     row = connect().execute(
-        "SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,)
+        "SELECT * FROM rag_artifacts WHERE artifact_id = ?", (artifact_id,)
     ).fetchone()
     return dict(row) if row else None
 
 
 def list_artifacts() -> list[dict[str, Any]]:
     rows = connect().execute(
-        "SELECT * FROM artifacts ORDER BY created_at DESC"
+        "SELECT * FROM rag_artifacts ORDER BY created_at DESC"
     ).fetchall()
     return [dict(r) for r in rows]

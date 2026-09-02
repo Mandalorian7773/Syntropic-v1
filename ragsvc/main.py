@@ -48,7 +48,6 @@ import tools as ragtools  # noqa: E402
 from contracts import (  # noqa: E402
     ArtifactInfo,
     DocumentInfo,
-    DocumentsResponse,
     ReindexResponse,
     RunContext,
     SearchHit,
@@ -75,14 +74,21 @@ app = FastAPI(title="SIH26117 ragsvc", version="0.1.0", lifespan=lifespan)
 
 
 def _document_info(row: dict) -> DocumentInfo:
+    """Map a ragsvc document row onto the shared contract shape.
+
+    The backend proxies /documents straight through to the SPA, so this is the
+    object the Documents panel renders. `status` drives its badge: it polls
+    while anything is not yet "indexed", so a document that failed to index has
+    to say "failed" rather than sit at "indexed" with zero chunks.
+    """
     return DocumentInfo(
-        id=row["id"],
+        doc_id=row["id"],
         filename=row["filename"],
         pages=row["pages"],
         chunks=row["chunk_count"],
+        ingested_at=row["ingested_at"],
+        status="indexed" if row["indexed"] else "failed",
         size_bytes=row["size_bytes"],
-        indexed=bool(row["indexed"]),
-        ingested_ts=row["ingested_at"],
     )
 
 
@@ -145,13 +151,19 @@ def upload(file: UploadFile = File(...)) -> UploadResponse:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"ingest failed: {exc}") from exc
 
-    row = ragdb.get_document(outcome.doc_id)
-    return UploadResponse(document=_document_info(row))
+    return UploadResponse(
+        file_id=outcome.doc_id,
+        filename=outcome.filename,
+        pages=outcome.pages,
+        status="indexed" if outcome.indexed else "failed",
+    )
 
 
-@app.get("/documents", response_model=DocumentsResponse)
-def list_documents() -> DocumentsResponse:
-    return DocumentsResponse(documents=[_document_info(r) for r in ragdb.list_documents()])
+@app.get("/documents", response_model=list[DocumentInfo])
+def list_documents() -> list[DocumentInfo]:
+    # A bare array, not an envelope. The contract is explicit about this and
+    # the SPA's rest.ts types it as DocumentInfo[].
+    return [_document_info(r) for r in ragdb.list_documents()]
 
 
 @app.get("/documents/{doc_id}")
@@ -191,10 +203,19 @@ def delete_document(doc_id: str) -> dict:
 
 @app.post("/documents/{doc_id}/reindex", response_model=ReindexResponse)
 def reindex(doc_id: str) -> ReindexResponse:
-    outcome = corpus.reindex(doc_id)
+    try:
+        outcome = corpus.reindex(doc_id)
+    except FileNotFoundError as exc:
+        # The row is real, the file behind it is not. 410 rather than 404: the
+        # difference matters to whoever is debugging, and an unhandled
+        # FileNotFoundError here is a 500 with a traceback for what is an
+        # ordinary, recoverable state.
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
     if outcome is None:
         raise HTTPException(status_code=404, detail=f"no document {doc_id!r}")
-    return ReindexResponse(id=outcome.doc_id, queued=False)
+    # queued=False because reindexing is synchronous here: it has already
+    # happened by the time this returns.
+    return ReindexResponse(doc_id=outcome.doc_id, queued=False)
 
 
 # --- search -----------------------------------------------------------------
@@ -210,7 +231,8 @@ def search(req: SearchRequest) -> SearchResponse:
                 filename=hit.filename,
                 page=hit.page,
                 score=hit.score,
-                snippet=hit.snippet(),
+                # The same window the agent gets, not the head of the chunk.
+                snippet=ragtools.focused_snippet(hit.text, req.query) or hit.snippet(),
             )
             for hit in result.hits
         ]
@@ -326,12 +348,24 @@ def download_artifact(artifact_id: str) -> FileResponse:
 
 
 class ToolCallRequest(BaseModel):
-    """What Person 3's registry posts to run one of these tools remotely."""
+    """What Person 3's registry posts to run one of these tools remotely.
 
+    It sends `{"args": {...}, "session_id": ...}`. Both spellings are accepted
+    because the alternative is a contract PR and a coordinated deploy to fix a
+    single key name, and because getting this wrong fails quietly: an unknown
+    field is dropped, the tool runs with no arguments, and the agent sees a
+    validation error three layers from the cause.
+    """
+
+    args: dict = Field(default_factory=dict)
     arguments: dict = Field(default_factory=dict)
     session_id: str = "http"
     workspace_dir: str | None = None
     artifacts_dir: str | None = None
+
+    @property
+    def tool_args(self) -> dict:
+        return self.args or self.arguments
 
 
 @app.get("/tools")
@@ -347,4 +381,4 @@ def call_tool(name: str, req: ToolCallRequest) -> ToolResult:
         workspace_dir=req.workspace_dir or str(cfg.WORKSPACE_DIR),
         artifacts_dir=req.artifacts_dir or str(cfg.ARTIFACTS_DIR),
     )
-    return ragtools.run_tool(name, req.arguments, context)
+    return ragtools.run_tool(name, req.tool_args, context)

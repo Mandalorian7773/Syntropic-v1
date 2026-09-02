@@ -1,6 +1,6 @@
 """Optical character recognition for scanned pages. Owner: person 2.
 
-CPU only. This is not a fallback, it is the architecture: all 8 GB of VRAM
+CPU only. This is not a fallback, it is the architecture: all 6 GB of VRAM
 belongs to the resident LLM, and an OCR model that evicts it costs ~8 seconds
 per page to swap back. See docs/decisions/0005-cpu-embeddings.md.
 

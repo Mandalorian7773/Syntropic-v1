@@ -9,6 +9,7 @@ tested with inputs far larger than anything a real corpus produces.
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -90,16 +91,73 @@ def test_search_content_stays_inside_the_budget_for_enormous_chunks(monkeypatch,
 
 
 def test_search_keeps_provenance_for_every_hit_even_when_truncating(monkeypatch, run_context):
-    """Truncation shortens passages; it must never drop a citation."""
+    """Truncation shortens snippets; it must never drop a citation.
+
+    The agent turns each hit into a `citation` event, which needs doc_id,
+    filename, page, score and snippet. A formatted string cannot carry doc_id
+    or score, so the content is JSON -- and every field has to survive the
+    truncation that a pathologically long passage forces.
+    """
     monkeypatch.setattr(
         "index.search.search", lambda *a, **k: _fake_hits(5, HUGE_PARAGRAPH)
     )
     tool = ragtools.BY_NAME["search_documents"]
-    result = tool.run(tool.args_model(query="q", top_k=5), run_context)
+    result = tool.run(tool.args_model(query="remaining life", top_k=5), run_context)
 
-    for page in range(1, 6):
-        assert f"p.{page}]" in result.content
-    assert result.content.count("TMS-2024-CDU-03-thickness-survey.pdf") == 5
+    payload = json.loads(result.content)
+    assert len(payload["hits"]) == 5, "a hit was dropped rather than shortened"
+    for index, hit in enumerate(payload["hits"]):
+        assert set(hit) >= {"doc_id", "filename", "page", "score", "snippet"}
+        assert hit["doc_id"], "no doc_id: the UI pins sources by it"
+        assert hit["filename"] == "TMS-2024-CDU-03-thickness-survey.pdf"
+        assert hit["page"] == index + 1
+        assert isinstance(hit["score"], (int, float))
+        assert hit["snippet"], "a hit with no snippet tells the model nothing"
+
+
+def test_search_content_is_parseable_json_when_nothing_matches(monkeypatch, run_context):
+    """The empty case has to parse too, or the agent's parser throws on zero hits."""
+    monkeypatch.setattr("index.search.search", lambda *a, **k: SearchResult())
+    tool = ragtools.BY_NAME["search_documents"]
+    result = tool.run(tool.args_model(query="nothing at all", top_k=5), run_context)
+
+    assert result.ok is True
+    assert json.loads(result.content)["hits"] == []
+
+
+def test_snippet_carries_the_answer_not_just_the_start_of_the_chunk(run_context):
+    """The window onto a chunk must follow the query, not the chunk's first line.
+
+    Regression test for a real failure: the retrieved chunk held the answer 464
+    characters in, head-truncation stopped before it, the model reissued the
+    identical query and the agent's loop detector aborted the turn.
+    """
+    buried = (
+        "6. Valve Register\n\n"
+        + "Preamble line that matches nothing in particular. " * 12
+        + "\n| Tag No. | Location | Set Pressure |\n| --- | --- | --- |\n"
+        + "| PSV-2101 | Reflux drum | 9.8 barg |\n"
+        + "| PSV-2103 | Debutaniser overhead | 12.5 barg |\n"
+        + "| PSV-2104 | Bottoms pump | 18.0 barg |\n"
+    )
+    result = SearchResult()
+    result.hits.append(
+        Hit(chunk_id="c1", doc_id="d1", filename="SOP.pdf", page=2,
+            section="6. Valve Register", text=buried, score=0.9)
+    )
+    import index.search as search_module
+
+    original = search_module.search
+    try:
+        search_module.search = lambda *a, **k: result
+        tool = ragtools.BY_NAME["search_documents"]
+        out = tool.run(tool.args_model(query="set pressure of PSV-2103", top_k=1), run_context)
+    finally:
+        search_module.search = original
+
+    snippet = json.loads(out.content)["hits"][0]["snippet"]
+    assert "PSV-2103" in snippet
+    assert "12.5" in snippet, f"the answer never reached the snippet: {snippet!r}"
 
 
 def test_read_document_truncates_and_spills_a_huge_document(run_context):

@@ -225,11 +225,23 @@ def delete_document(doc_id: str) -> bool:
 
 
 def reindex(doc_id: str) -> IngestOutcome | None:
-    """Re-run ingest for a document already on disk, keeping its id."""
+    """Re-run ingest for a document already on disk, keeping its id.
+
+    Returns None when the id is unknown; raises FileNotFoundError when the row
+    exists but the file behind it has gone. Those are different failures and
+    the caller reports them differently -- a stale row after someone cleared
+    the workspace is not the same as a typo in a document id.
+    """
     row = ragdb.get_document(doc_id)
     if not row:
         return None
-    return ingest_file(row["path"], doc_id=doc_id, filename=row["filename"])
+    source = Path(row["path"])
+    if not source.exists():
+        raise FileNotFoundError(
+            f"{row['filename']} is still registered but its source file is gone "
+            f"from {source}. Re-upload it, or delete the document."
+        )
+    return ingest_file(source, doc_id=doc_id, filename=row["filename"])
 
 
 def read_document(doc_id: str, pages: list[int] | None = None) -> tuple[dict, list[dict]]:

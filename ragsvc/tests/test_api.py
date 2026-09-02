@@ -39,11 +39,37 @@ def test_health_reports_index_state_and_missing_weights(client):
 # --- documents --------------------------------------------------------------
 
 
-def test_documents_listing_matches_the_contract_shape(client):
+def test_documents_listing_is_a_bare_array_in_contract_shape(client):
+    """A bare array, not an envelope: rest.ts types it as DocumentInfo[]."""
     body = client.get("/documents").json()
-    assert "documents" in body
-    for document in body["documents"]:
-        assert {"id", "filename", "pages", "chunks", "size_bytes", "indexed", "ingested_ts"} <= set(document)
+    assert isinstance(body, list)
+    for document in body:
+        assert {
+            "doc_id", "filename", "pages", "chunks", "ingested_at", "status", "size_bytes"
+        } <= set(document)
+        # The SPA polls while status is anything but indexed, so a document
+        # that never indexed must not claim it did.
+        assert document["status"] in {"indexed", "failed", "queued", "ingesting"}
+
+
+def test_reindexing_a_document_whose_file_vanished_is_410_not_500(client):
+    """A stale row after someone cleared the workspace is an ordinary state.
+
+    It used to raise FileNotFoundError out of the endpoint and surface as a 500
+    with a traceback, which is indistinguishable from the service being broken.
+    """
+    ragdb.upsert_document(
+        doc_id="reindex-missing-file", filename="x.pdf", path="/nonexistent/x.pdf",
+        pages=0, chunk_count=0, size_bytes=0, sha256="0" * 64, scanned=False,
+        indexed=False, ingest_ms=0,
+    )
+    response = client.post("/documents/reindex-missing-file/reindex")
+    assert response.status_code == 410
+    assert "source file is gone" in response.json()["detail"]
+
+
+def test_reindexing_an_unknown_document_is_404(client):
+    assert client.post("/documents/no-such-doc/reindex").status_code == 404
 
 
 def test_unsupported_file_types_are_refused(client):
@@ -192,6 +218,23 @@ def test_running_a_tool_over_http_returns_a_toolresult(client):
     body = response.json()
     assert {"ok", "content", "raw_path", "artifacts", "duration_ms", "error"} <= set(body)
     assert isinstance(body["duration_ms"], int)
+
+
+def test_the_backend_registrys_args_key_is_accepted(client):
+    """backend/tools/registry.py posts `args`, not `arguments`.
+
+    Getting this wrong fails silently: the unknown field is dropped, the tool
+    runs with no arguments, and the agent sees a validation error three layers
+    from the cause. So both spellings are accepted and both are tested.
+    """
+    response = client.post(
+        "/tools/search_documents",
+        json={"args": {"query": "relief valve", "top_k": 2}, "session_id": "s1"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True, body
+    assert "query" not in (body["error"] or ""), "arguments were dropped"
 
 
 def test_an_unknown_tool_name_comes_back_as_a_failed_result_not_a_500(client):

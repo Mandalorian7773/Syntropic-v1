@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import statistics
 import sys
 import time
@@ -174,6 +175,65 @@ def evaluate(questions: list[dict], mode: str, use_rerank: bool, top_k: int) -> 
     }
 
 
+ANSWER_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[-./][A-Za-z0-9]+)*")
+
+
+def _answer_keys(answer: str) -> list[str]:
+    """The distinctive parts of an expected answer: numbers and long words."""
+    return [
+        token
+        for token in ANSWER_TOKEN_RE.findall(answer)
+        if any(c.isdigit() for c in token) or len(token) > 4
+    ]
+
+
+def answer_presence(questions: list[dict], top_k: int = 5) -> dict:
+    """Does the expected answer actually reach the model?
+
+    recall@5 says the right chunk was retrieved. It does not say the answer
+    survived into the snippet the agent sees, and those came apart badly here:
+    with recall@5 at a flat 1.000, the answer was reaching the model in only
+    some cases because snippets were cut from the front of the chunk, and a
+    valve register row 464 characters in never made it. The agent then had five
+    passages and no answer, reissued the same query, and its loop detector
+    killed the turn -- a retrieval success that reads as a total failure.
+
+    So this measures the tool output the agent is actually handed.
+    """
+    import tools as ragtools  # noqa: PLC0415
+    from contracts import RunContext  # noqa: PLC0415
+
+    context = RunContext(
+        session_id="eval",
+        workspace_dir=str(cfg.WORKSPACE_DIR),
+        artifacts_dir=str(cfg.ARTIFACTS_DIR),
+    )
+    tool = ragtools.BY_NAME["search_documents"]
+
+    hits, misses = 0, []
+    for question in questions:
+        answer = question.get("answer", "")
+        keys = _answer_keys(answer)
+        if not keys:
+            continue
+        content = tool.run(
+            tool.args_model(query=question["question"], top_k=top_k), context
+        ).content.lower()
+        found = [k for k in keys if k.lower() in content]
+        if len(found) >= max(1, len(keys) // 2):
+            hits += 1
+        else:
+            misses.append(question["id"])
+
+    scored = len([q for q in questions if _answer_keys(q.get("answer", ""))])
+    return {
+        "scored": scored,
+        "present": hits,
+        f"answer_present@{top_k}": round(hits / scored, 4) if scored else 0.0,
+        "misses": misses,
+    }
+
+
 def print_summary(name: str, result: dict) -> None:
     recalls = "  ".join(
         f"r@{k}={result[f'recall@{k}']:.3f}" for k in RECALL_AT if f"recall@{k}" in result
@@ -287,6 +347,14 @@ def main() -> int:
         )
     print("retrieval_eval: by question kind ->", json.dumps(headline["by_kind"]))
 
+    presence = answer_presence(questions, top_k=5)
+    print(
+        f"retrieval_eval: answer present in tool output = "
+        f"{presence['answer_present@5']:.3f} "
+        f"({presence['present']}/{presence['scored']})"
+        + (f"   missing: {', '.join(presence['misses'])}" if presence["misses"] else "")
+    )
+
     payload = {
         "generated_at": int(time.time()),
         "questions_file": str(args.questions),
@@ -302,6 +370,7 @@ def main() -> int:
             "rerank_max_len": cfg.RERANK_MAX_LEN,
         },
         "corpus_stats": corpus.stats(),
+        "answer_presence": presence,
         "results": results,
     }
     out_path = Path(args.out)

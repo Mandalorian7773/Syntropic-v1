@@ -127,13 +127,13 @@ def next_reference(prefix: str, template_id: str | None = None, year: int | None
         end = int(time.mktime((year + 1, 1, 1, 0, 0, 0, 0, 1, -1)))
         if template_id:
             row = ragdb.connect().execute(
-                "SELECT COUNT(*) FROM artifacts "
+                "SELECT COUNT(*) FROM rag_artifacts "
                 "WHERE template = ? AND created_at >= ? AND created_at < ?",
                 (template_id, start, end),
             ).fetchone()
         else:
             row = ragdb.connect().execute(
-                "SELECT COUNT(*) FROM artifacts "
+                "SELECT COUNT(*) FROM rag_artifacts "
                 "WHERE template IS NOT NULL AND created_at >= ? AND created_at < ?",
                 (start, end),
             ).fetchone()

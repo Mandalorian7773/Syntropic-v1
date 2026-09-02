@@ -6,11 +6,16 @@
 
 ## Context
 
-The workbench has one 8 GB GPU and decision
-[0003](0003-one-gpu-model-resident.md) has already spent all of it: exactly one
-GGUF is resident, and `config/models.yaml` budgets 5.6 GB for the vision
-generalist plus a 16k KV cache. There is no room left for a second model, and
-no way to make room that does not evict the language model.
+The workbench has one **6 GB** GPU -- an RTX 4050, 6141 MiB usable -- and
+decision [0003](0003-one-gpu-model-resident.md) has already spent all of it:
+exactly one GGUF is resident. Measured on a clean card by Person 3, the vision
+model plus its multimodal projector at 16k context occupies 5903 MiB, leaving
+**238 MiB free**.
+
+(The scaffold and an earlier draft of this record both said 8 GB, which came
+from `models/MANIFEST.yaml` rather than from the hardware. The correction makes
+the argument below stronger, not weaker: there was never 2 GB of slack to
+argue over.)
 
 Eviction is the whole argument. Reloading a 7B GGUF takes about 8 seconds. An
 embedding model sharing the GPU would force that reload on every query that

@@ -5,7 +5,7 @@ description = "Document ingest, hybrid retrieval and artifact generation. Owner:
 requires-python = ">=3.11"
 
 # Everything here is CPU-only and wheel-only. There is no torch in this tree
-# and there must not be: the 8 GB of VRAM belongs to llama-server, and a torch
+# and there must not be: the 6 GB of VRAM belongs to llama-server, and a torch
 # wheel is 2.5 GB to vendor into the offline bundle for no benefit.
 # See docs/decisions/0005-cpu-embeddings.md.
 dependencies = [
