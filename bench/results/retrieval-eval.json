@@ -1,0 +1,409 @@
+{
+  "generated_at": 1788381147,
+  "questions_file": "D:\\SIH\\Syntropic-v1\\ragsvc\\eval\\questions.jsonl",
+  "corpus": "D:\\SIH\\Syntropic-v1\\demo\\documents",
+  "top_k": 10,
+  "config": {
+    "chunk_tokens": 600,
+    "chunk_overlap": 100,
+    "dense_top": 30,
+    "sparse_top": 30,
+    "rrf_k": 60,
+    "embed_max_len": 768,
+    "rerank_max_len": 320
+  },
+  "corpus_stats": {
+    "documents": 8,
+    "pages": 29,
+    "chunks": 56,
+    "vectors": 56,
+    "bm25_chunks": 56,
+    "qdrant": true,
+    "qdrant_mode": "server",
+    "collection": "kb",
+    "updated": 1788381147
+  },
+  "answer_presence": {
+    "scored": 30,
+    "present": 29,
+    "answer_present@5": 0.9667,
+    "misses": [
+      "q27"
+    ]
+  },
+  "results": {
+    "hybrid": {
+      "mode": "hybrid",
+      "rerank": false,
+      "questions": 30,
+      "recall@1": 0.8333,
+      "recall@3": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 0.9056,
+      "recall@5_exact_page": 1.0,
+      "latency_ms": {
+        "mean": 133.6,
+        "p50": 55.8,
+        "p95": 76.0,
+        "max": 2376.0
+      },
+      "by_kind": {
+        "table": {
+          "n": 8,
+          "hit@5": 8,
+          "recall@5": 1.0
+        },
+        "prose": {
+          "n": 5,
+          "hit@5": 5,
+          "recall@5": 1.0
+        },
+        "identifier": {
+          "n": 6,
+          "hit@5": 6,
+          "recall@5": 1.0
+        },
+        "scanned": {
+          "n": 11,
+          "hit@5": 11,
+          "recall@5": 1.0
+        }
+      },
+      "misses": [],
+      "provenance_failures": 0,
+      "per_question": [
+        {
+          "id": "q01",
+          "kind": "table",
+          "question": "What is the design pressure of vessel V-1201?",
+          "expected": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 2376.0,
+          "top_hit": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q02",
+          "kind": "table",
+          "question": "What corrosion allowance was specified for V-1201?",
+          "expected": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "rank": 2,
+          "exact_rank": 2,
+          "latency_ms": 55.8,
+          "top_hit": "APR-2023-0088-approval-note.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q03",
+          "kind": "table",
+          "question": "What is the minimum recorded shell thickness at CML-07 on V-1201?",
+          "expected": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 76.0,
+          "top_hit": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q04",
+          "kind": "prose",
+          "question": "When is the next internal inspection of V-1201 due?",
+          "expected": "INS-2024-0117-vessel-inspection.pdf p.2",
+          "rank": 3,
+          "exact_rank": 3,
+          "latency_ms": 65.7,
+          "top_hit": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q05",
+          "kind": "prose",
+          "question": "Which API standard governs the in-service inspection of V-1201?",
+          "expected": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 51.8,
+          "top_hit": "INS-2024-0117-vessel-inspection.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q06",
+          "kind": "table",
+          "question": "What was the condition of the V-1201 insulation at the north nozzle?",
+          "expected": "INS-2024-0117-vessel-inspection.pdf p.2",
+          "rank": 3,
+          "exact_rank": 3,
+          "latency_ms": 61.5,
+          "top_hit": "APR-2023-0088-approval-note.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q07",
+          "kind": "identifier",
+          "question": "What is the set pressure of PSV-2103?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 39.8,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q08",
+          "kind": "scanned",
+          "question": "What pop test tolerance applies to set pressures above 70 psig?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 55.0,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q09",
+          "kind": "scanned",
+          "question": "Which test medium is specified for relief valve bench testing?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 53.8,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q10",
+          "kind": "scanned",
+          "question": "What is the maximum interval between relief valve overhauls in clean service?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 70.4,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q11",
+          "kind": "scanned",
+          "question": "Who authorises removal of a relief valve from service?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 41.1,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q12",
+          "kind": "identifier",
+          "question": "On which line is PSV-2103 installed?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.2",
+          "rank": 2,
+          "exact_rank": 2,
+          "latency_ms": 55.9,
+          "top_hit": "4102-LL-002-line-list.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q13",
+          "kind": "scanned",
+          "question": "At what pressure is the seat tightness test carried out?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 56.2,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q14",
+          "kind": "scanned",
+          "question": "How long must relief valve test certificates be retained?",
+          "expected": "SOP-INSP-014-relief-valve-testing.pdf p.20",
+          "rank": 2,
+          "exact_rank": 2,
+          "latency_ms": 62.9,
+          "top_hit": "SOP-INSP-014-relief-valve-testing.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q15",
+          "kind": "identifier",
+          "question": "What thickness was measured at CML-12 on line 8-P-1104?",
+          "expected": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 74.4,
+          "top_hit": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q16",
+          "kind": "table",
+          "question": "What is the calculated corrosion rate at CML-12?",
+          "expected": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 66.4,
+          "top_hit": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q17",
+          "kind": "table",
+          "question": "Which condition monitoring location has the lowest remaining life?",
+          "expected": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 62.7,
+          "top_hit": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q18",
+          "kind": "prose",
+          "question": "What is the retirement thickness for line 8-P-1104?",
+          "expected": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 49.6,
+          "top_hit": "TMS-2024-CDU-03-thickness-survey.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q19",
+          "kind": "scanned",
+          "question": "What is the design temperature of line 6-P-2104?",
+          "expected": "4102-LL-002-line-list.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 44.7,
+          "top_hit": "4102-LL-002-line-list.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q20",
+          "kind": "identifier",
+          "question": "What material specification is used for line 6-P-2104?",
+          "expected": "4102-LL-002-line-list.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 83.4,
+          "top_hit": "4102-LL-002-line-list.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q21",
+          "kind": "identifier",
+          "question": "Which drawing number shows the debutaniser overhead circuit?",
+          "expected": "4102-LL-002-line-list.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 45.4,
+          "top_hit": "4102-LL-002-line-list.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q22",
+          "kind": "scanned",
+          "question": "What insulation is specified for line 10-S-3301?",
+          "expected": "4102-LL-002-line-list.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 47.4,
+          "top_hit": "4102-LL-002-line-list.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q23",
+          "kind": "scanned",
+          "question": "What delivery lead time did the vendor quote for the replacement bellows?",
+          "expected": "QTN-BHE-2024-0871-vendor-quotation.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 63.7,
+          "top_hit": "QTN-BHE-2024-0871-vendor-quotation.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q24",
+          "kind": "identifier",
+          "question": "What is the vendor's quotation reference number?",
+          "expected": "QTN-BHE-2024-0871-vendor-quotation.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 48.0,
+          "top_hit": "QTN-BHE-2024-0871-vendor-quotation.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q25",
+          "kind": "scanned",
+          "question": "What warranty period did the vendor offer?",
+          "expected": "QTN-BHE-2024-0871-vendor-quotation.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 36.2,
+          "top_hit": "QTN-BHE-2024-0871-vendor-quotation.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q26",
+          "kind": "prose",
+          "question": "What expenditure was approved for the V-1201 nozzle repair?",
+          "expected": "APR-2023-0088-approval-note.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 44.6,
+          "top_hit": "APR-2023-0088-approval-note.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q27",
+          "kind": "prose",
+          "question": "Who gave final approval for the V-1201 nozzle repair note?",
+          "expected": "APR-2023-0088-approval-note.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 55.8,
+          "top_hit": "APR-2023-0088-approval-note.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q28",
+          "kind": "table",
+          "question": "What is the maximum permissible angular misalignment for a coupled pump?",
+          "expected": "SOP-MECH-021-pump-alignment.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 67.4,
+          "top_hit": "SOP-MECH-021-pump-alignment.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q29",
+          "kind": "table",
+          "question": "What is the vibration alarm limit for centrifugal pumps?",
+          "expected": "SOP-MECH-021-pump-alignment.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 44.0,
+          "top_hit": "SOP-MECH-021-pump-alignment.pdf p.1",
+          "missing_provenance": []
+        },
+        {
+          "id": "q30",
+          "kind": "scanned",
+          "question": "What was the immediate cause of the P-101A seal failure in August 2023?",
+          "expected": "INC-2023-014-incident-summary.pdf p.1",
+          "rank": 1,
+          "exact_rank": 1,
+          "latency_ms": 52.4,
+          "top_hit": "INC-2023-014-incident-summary.pdf p.1",
+          "missing_provenance": []
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,94 @@
+# Inspection summary template. Owner: person 2.
+#
+# The findings table is the document. Everything above it is context and
+# everything below it is process; an inspection engineer reads the table and
+# skims the rest.
+#
+# Severity is a fixed vocabulary rather than free text, and it is colour-banded
+# in the rendered table. That is not decoration: a reviewer scanning fifteen
+# findings for the one that is Critical is doing a visual search, and a table
+# where severity is a word in a column of words defeats it.
+
+id: inspection_summary
+title: Inspection Summary Report
+document_type: INSPECTION SUMMARY REPORT
+reference_prefix: INS
+orientation: portrait
+
+header_fields:
+  - key: reference
+    label: "Report No."
+    auto: reference
+  - key: date
+    label: "Date of Report"
+    auto: date
+  - key: equipment
+    label: "Equipment / Tag No."
+    default: ""
+  - key: unit
+    label: "Unit / Area"
+    default: ""
+  - key: inspection_date
+    label: "Date of Inspection"
+    default: ""
+  - key: inspection_type
+    label: "Inspection Type"
+    default: "Visual / External"
+  - key: inspector
+    label: "Inspected By"
+    default: ""
+  - key: standard
+    label: "Reference Standard"
+    default: ""
+
+subject_label: "Scope of Inspection"
+
+sections:
+  - key: scope
+    heading: "1. Scope and Method"
+    required: true
+    hint: "What was inspected, by what method, and what was excluded."
+  - key: findings
+    heading: "2. Findings"
+    required: true
+    kind: table
+    columns: ["S.No", "Observation", "Severity", "Source Reference", "Recommended Action", "Target Date"]
+    hint: "One row per finding. Severity from the vocabulary below."
+  - key: condition
+    heading: "3. Condition Assessment"
+    required: false
+  - key: recommendation
+    heading: "4. Recommendations"
+    required: true
+  - key: next_inspection
+    heading: "5. Next Inspection Due"
+    required: false
+  - key: references
+    heading: "6. Source Documents"
+    required: false
+    hint: "Filename and page for every finding traced to an ingested document."
+
+severity:
+  vocabulary: ["Critical", "Major", "Minor", "Observation", "Satisfactory"]
+  colours:
+    Critical: "C00000"
+    Major: "ED7D31"
+    Minor: "FFC000"
+    Observation: "4472C4"
+    Satisfactory: "70AD47"
+
+signature_block:
+  columns:
+    - role: "Inspected By"
+      lines: ["Name", "Designation", "Date"]
+    - role: "Reviewed By"
+      lines: ["Name", "Designation", "Date"]
+    - role: "Approved By"
+      lines: ["Name", "Designation", "Date"]
+
+distribution:
+  label: "Distribution"
+  default:
+    - "Head - Inspection and Reliability"
+    - "Unit Operations Manager"
+    - "Equipment history file"

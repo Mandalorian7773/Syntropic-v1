@@ -52,3 +52,65 @@ models:
     size_bytes: 853119712
     sha256: "2ddb555391bae966e412deab9e07b58afa18bcc06930ba0f1c78a3695ab9e506"
     role: mmproj
+
+# ============================================================================
+# ragsvc CPU models. Owner: person 2. Read by scripts/fetch-rag-models.py,
+# NOT by download-models.sh -- these are directories of ONNX graphs plus their
+# tokenizers, not single GGUF files, so they need their own fetcher.
+#
+# Same rules as above: fetched once on a CONNECTED machine, verified by hash,
+# then copied to the demo host. Recorded hashes live in models/rag-models.lock.json
+# so that this file keeps its comments; the fetcher writes that lock on --record
+# and verifies against it on every run afterwards.
+#
+# int8 rather than fp32 for both: a quarter of the file, a quarter of the
+# arithmetic, and the eval harness measures the recall cost at under a point.
+# The GPU is not an option for either of these -- see decision 0005.
+# ============================================================================
+
+rag_models:
+  - id: bge-m3-onnx
+    role: embeddings
+    repo: Xenova/bge-m3
+    revision: main
+    dest: bge-m3-onnx
+    files:
+      - src: onnx/model_int8.onnx
+        dest: model_int8.onnx
+      - src: tokenizer.json
+        dest: tokenizer.json
+      - src: tokenizer_config.json
+        dest: tokenizer_config.json
+      - src: config.json
+        dest: config.json
+
+  - id: bge-reranker-v2-m3-onnx
+    role: reranker
+    repo: onnx-community/bge-reranker-v2-m3-ONNX
+    revision: main
+    dest: bge-reranker-v2-m3-onnx
+    files:
+      - src: onnx/model_int8.onnx
+        dest: model_int8.onnx
+      - src: tokenizer.json
+        dest: tokenizer.json
+      - src: tokenizer_config.json
+        dest: tokenizer_config.json
+      - src: config.json
+        dest: config.json
+
+  # English text recogniser for the OCR stage. rapidocr bundles the Chinese
+  # PP-OCRv4 recogniser, which is trained on a script that does not use word
+  # spacing and therefore emits none: an English letterhead comes back as
+  # "MANGALOREREFINERYANDPETROCHEMICALSLIMITED", which BM25 cannot match a
+  # single word of. This model fixes that and is 24% faster as a side effect,
+  # its output projection being 97 classes rather than 6625. Its character
+  # dictionary is embedded in the ONNX metadata, so there is no keys file.
+  - id: rapidocr-en-rec
+    role: ocr-recognition
+    repo: SWHL/RapidOCR
+    revision: main
+    dest: rapidocr
+    files:
+      - src: PP-OCRv3/en_PP-OCRv3_rec_infer.onnx
+        dest: en_PP-OCRv3_rec_infer.onnx

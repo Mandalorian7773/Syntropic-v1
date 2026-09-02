@@ -1,0 +1,56 @@
+{
+  "bge-m3-onnx": {
+    "files": {
+      "config.json": {
+        "sha256": "734a79bf12d388c1467a4e3ab625f45de7f6906cffcfb93a1eca1787504bed95",
+        "size_bytes": 770
+      },
+      "model_int8.onnx": {
+        "sha256": "a206e10e995aa2a833924bcd725ba5dd6c3425cd34bac3cf2b5677cd2a1c51d6",
+        "size_bytes": 568456694
+      },
+      "tokenizer.json": {
+        "sha256": "6710678b12670bc442b99edc952c4d996ae309a7020c1fa0096dd245c2faf790",
+        "size_bytes": 17082821
+      },
+      "tokenizer_config.json": {
+        "sha256": "7e4c1cc848840aeccdd763458c18dd525eb0f795c992e00ebe9c28554e7db2d4",
+        "size_bytes": 1173
+      }
+    },
+    "repo": "Xenova/bge-m3",
+    "revision": "main"
+  },
+  "bge-reranker-v2-m3-onnx": {
+    "files": {
+      "config.json": {
+        "sha256": "122e922dcfed6503c8721e6fe1daf090340c3d95ca7f3aa3a72730b321a51cfd",
+        "size_bytes": 848
+      },
+      "model_int8.onnx": {
+        "sha256": "912fc1215c2dbff6499700534bd8d31253af01573861abbfc43afd1fab6cce5d",
+        "size_bytes": 570727094
+      },
+      "tokenizer.json": {
+        "sha256": "8bf8afbfd11306bd872018c53bfdf2e160a56f8edbcf49933324404791c148d3",
+        "size_bytes": 17082900
+      },
+      "tokenizer_config.json": {
+        "sha256": "b87c8703482b0300d3da30e201519aa641f6a450f5eb5bf1e624afbf70c74d80",
+        "size_bytes": 1203
+      }
+    },
+    "repo": "onnx-community/bge-reranker-v2-m3-ONNX",
+    "revision": "main"
+  },
+  "rapidocr-en-rec": {
+    "files": {
+      "en_PP-OCRv3_rec_infer.onnx": {
+        "sha256": "ef7abd8bd3629ae57ea2c28b425c1bd258a871b93fd2fe7c433946ade9b5d9ea",
+        "size_bytes": 8967018
+      }
+    },
+    "repo": "SWHL/RapidOCR",
+    "revision": "main"
+  }
+}

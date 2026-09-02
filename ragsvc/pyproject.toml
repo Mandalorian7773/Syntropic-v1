@@ -3,27 +3,66 @@ name = "ragsvc"
 version = "0.1.0"
 description = "Document ingest, hybrid retrieval and artifact generation. Owner: person 2."
 requires-python = ">=3.11"
+
+# Everything here is CPU-only and wheel-only. There is no torch in this tree
+# and there must not be: the 6 GB of VRAM belongs to llama-server, and a torch
+# wheel is 2.5 GB to vendor into the offline bundle for no benefit.
+# See docs/decisions/0005-cpu-embeddings.md.
 dependencies = [
   "contracts",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
   "python-multipart>=0.0.12",
   "pyyaml>=6.0",
+
+  # Ingest
+  "pymupdf>=1.24",              # PDF render + native text extraction
+  "opencv-python-headless>=4.10", # deskew / denoise / threshold, no GUI libs
+  "pillow>=10.3",
+  "numpy>=1.26,<3",
+
+  # Index
+  "onnxruntime>=1.18",          # BGE-M3 and the reranker, int8, CPU
+  "tokenizers>=0.19",           # the models' own tokenizer, loaded from disk
+  "qdrant-client>=1.9",
+  "rank-bm25>=0.2.2",
+
+  # Deliverables
+  "python-docx>=1.1",
+  "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
-# Heavy ingest/index deps are deliberately NOT in the base install: `make setup`
-# must finish on a fresh laptop without pulling a torch wheel. Person 2 adds
-# them here (qdrant-client, rapidocr/paddleocr, onnxruntime, rank-bm25,
-# python-docx, openpyxl) and vendors the wheels into the offline cache.
-dev = ["pytest>=8.3"]
+# rapidocr-onnxruntime ships the PP-OCRv4 detection and recognition weights
+# inside the wheel, so it can never reach for the network on first use. That is
+# the whole reason it is the default: `paddleocr` downloads its models to
+# ~/.paddleocr on first call unless every model dir is passed explicitly, and a
+# first call that happens on stage is a first call that fails.
+ocr = ["rapidocr-onnxruntime>=1.3.24"]
+# The literal PaddleOCR stack, for anyone who wants the reference
+# implementation. ingest/ocr.py drives either one; see RAG_OCR_BACKEND.
+paddle = ["paddleocr>=2.7,<3", "paddlepaddle>=2.6,<3"]
+dev = ["pytest>=8.3", "httpx>=0.27"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["ingest", "index", "artifacts"]
+# Deliberately NOT exporting a top-level `tools` module: backend/pyproject.toml
+# already installs a package by that name, and two of them on one sys.path is a
+# debugging afternoon nobody has. ragsvc/tools.py is imported by path (uvicorn
+# runs with cwd=ragsvc) or reached over HTTP via /tools -- see tools.py.
+packages = ["ingest", "index", "docgen"]
+# The `rag` prefix on these is not decoration either: they share a sys.path
+# with backend's `db`, `tools` and `audit`, and generic names collide.
+py-modules = ["ragconfig", "ragdb", "ragbudget", "netguard", "corpus"]
+
+[tool.setuptools.package-data]
+docgen = ["templates/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "slow: loads a model or runs OCR. `pytest -m 'not slow'` keeps the inner loop fast",
+]

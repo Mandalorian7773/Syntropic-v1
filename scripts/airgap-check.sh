@@ -21,7 +21,9 @@ echo "airgap-check: static checks"
 #      - local hostnames and compose service names: those are the whole point
 #      - schema/xmlns URNs (json-schema.org, w3.org, openxmlformats.org): they
 #        are identifiers, never fetched
-#      - the three setup-time scripts, which are allowed to touch the network
+#      - the setup-time fetchers, which are allowed to touch the network and
+#        never run on the demo host (download-models.sh, package-offline.sh,
+#        fetch-rag-models.py, and this script itself)
 #      - comment lines
 hits="$(grep -rInE 'https?://' \
   --include='*.py' --include='*.ts' --include='*.tsx' --include='*.js' \
@@ -36,6 +38,7 @@ hits="$(grep -rInE 'https?://' \
   | grep -vE 'json-schema\.org|openxmlformats\.org|w3\.org' \
   | grep -vE '^[^:]+:[0-9]+: *(#|//|\*|--)' \
   | grep -vE '/scripts/(download-models|airgap-check|package-offline)\.sh:' \
+  | grep -vE '/scripts/fetch-rag-models\.py:' \
   || true)"
 if [ -n "$hits" ]; then
   fail "external URLs found in source:"

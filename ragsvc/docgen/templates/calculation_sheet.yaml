@@ -1,0 +1,90 @@
+# Calculation sheet template. Owner: person 2.
+#
+# The problem statement asks for calculations with the steps shown, and this
+# template is what "shown" means in engineering practice: the formula appears
+# symbolically first, then again with every symbol replaced by its value and
+# unit, and only then the result. A sheet that prints "Result: 12.7 mm" and
+# nothing else cannot be checked, and an engineering calculation nobody can
+# check has no standing.
+#
+# Assumptions get their own numbered section for the same reason. In a real
+# thickness or relief-load calculation, the assumptions are where the argument
+# actually lives, and burying them in prose is how a wrong corrosion allowance
+# survives review.
+
+id: calculation_sheet
+title: Engineering Calculation Sheet
+document_type: ENGINEERING CALCULATION SHEET
+reference_prefix: CAL
+orientation: portrait
+
+header_fields:
+  - key: reference
+    label: "Calculation No."
+    auto: reference
+  - key: date
+    label: "Date"
+    auto: date
+  - key: equipment
+    label: "Equipment / Tag No."
+    default: ""
+  - key: unit
+    label: "Unit / Area"
+    default: ""
+  - key: standard
+    label: "Design Code"
+    default: ""
+  - key: revision
+    label: "Revision"
+    default: "0"
+
+subject_label: "Purpose of Calculation"
+
+sections:
+  - key: inputs
+    heading: "1. Input Data"
+    required: true
+    kind: table
+    columns: ["Symbol", "Description", "Value", "Unit", "Source"]
+    hint: "Every symbol used below must appear here with its source."
+  - key: formula
+    heading: "2. Formula"
+    required: true
+    kind: formula
+    hint: "Symbolic form, as printed in the code clause being applied."
+  - key: substitution
+    heading: "3. Substitution"
+    required: true
+    kind: formula
+    hint: "The same expression with values and units substituted."
+  - key: result
+    heading: "4. Result"
+    required: true
+    kind: result
+  - key: assessment
+    heading: "5. Assessment Against Criteria"
+    required: false
+  - key: assumptions
+    heading: "6. Assumptions"
+    required: true
+    kind: numbered
+    hint: "Each assumption on its own numbered line."
+  - key: references
+    heading: "7. References"
+    required: false
+
+signature_block:
+  columns:
+    - role: "Calculated By"
+      lines: ["Name", "Designation", "Date"]
+    - role: "Checked By"
+      lines: ["Name", "Designation", "Date"]
+    - role: "Approved By"
+      lines: ["Name", "Designation", "Date"]
+
+distribution:
+  label: "Distribution"
+  default:
+    - "Head - Inspection and Reliability"
+    - "Design and Projects"
+    - "Equipment history file"
