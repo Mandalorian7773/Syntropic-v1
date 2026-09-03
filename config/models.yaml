@@ -57,6 +57,35 @@ models:
     default: false
 
   # ---------------------------------------------------------------------------
+  # Fast, small, and deliberately NOT routable. `fast` is a capability nothing
+  # asks for, so the router can never select this model -- only a user picking
+  # it explicitly can.
+  #
+  # It was added intending to make it the general-chat default, on the theory
+  # that a 3B would cut latency. Measured on the same four general prompts,
+  # same system prompt, same grammar, same GPU, that was wrong:
+  #
+  #                        3B        VL-7B
+  #   answered directly    2/4        4/4
+  #   tool-reached         2/4        0/4
+  #   latency         0.6-2.1s   1.5-4.1s
+  #   load                4.1s      14.1s
+  #   VRAM             2337 MB    5903 MB
+  #
+  # It is quicker per token but reaches for a tool twice as often, and one
+  # needless tool call costs a whole extra round trip -- so as the default it
+  # would have been slower end to end and worse. It earns its place as the
+  # low-VRAM option in the model picker, not as a default.
+  # ---------------------------------------------------------------------------
+  - id: qwen2.5-3b
+    path: D:/sih/models/qwen2.5-3b-instruct-q4_k_m.gguf
+    mmproj: null
+    capabilities: [fast]
+    context: 16384
+    vram_mb: 2337
+    default: false
+
+  # ---------------------------------------------------------------------------
   # No separate vision model. qwen2.5-vl-7b above carries `vision`, so the
   # router's image rule still has exactly one model to land on -- with 16384
   # context instead of LLaVA-1.6's 4096, which matters for a scanned report.

@@ -36,6 +36,18 @@ from pydantic import BaseModel, ValidationError
 
 log = logging.getLogger(__name__)
 
+# Substrings a tool uses to say "my backing service is down", as opposed to
+# "your arguments were wrong". Kept as a list rather than a ToolResult field
+# because ToolResult is a frozen contract shared with person 2 -- widening it
+# needs the change protocol, and this is a local scheduling decision.
+_UNAVAILABLE_MARKERS = ("sandbox unavailable", "docker unavailable",
+                        "ragsvc unreachable", "docker sdk not installed")
+
+
+def _is_unavailable(error: str | None) -> bool:
+    lowered = (error or "").lower()
+    return any(m in lowered for m in _UNAVAILABLE_MARKERS)
+
 from contracts import (
     AgentError,
     AgentStep,
@@ -72,19 +84,37 @@ object and nothing else, in one of two shapes:
   {{"tool": "<name>", "args": {{...}}}}   to use a tool
   {{"final": "<your answer>"}}            when you are done
 
+MOST QUESTIONS NEED NO TOOL. If you already know the answer, emit
+{{"final": ...}} on the FIRST step. Reaching for a tool you do not need costs
+the user ten seconds and usually returns nothing relevant. Examples that need
+no tool at all:
+  "Why is nitrogen purging done before opening a vessel?"  -> answer directly
+  "What is a flare stack for?"                             -> answer directly
+  "What does corrosion under insulation mean?"             -> answer directly
+Reach for a tool only when the answer depends on something you cannot know:
+this plant's documents, a file in the workspace, or a number you must compute.
+
 Available tools:
 {tools}
 
-Choosing a tool:
-- Any question about plant documents -- procedures, SOPs, inspection or
-  incident reports, drawings, quotations, or an equipment tag such as
-  PSV-2103 or V-1201 -- starts with search_documents. That is the only way
-  to reach the ingested corpus.
+Choosing a tool -- and whether to use one at all:
+- Answer from your own knowledge, with NO tool, when the question is general
+  engineering or process knowledge: what a flare stack is for, why nitrogen
+  purging is done, what corrosion under insulation means. These have no answer
+  in the document store and searching for them wastes a step.
+- Use search_documents when the question is about THIS plant's paperwork: an
+  equipment tag such as PSV-2103 or V-1201, a document number, "the SOP", "the
+  inspection report", a specific measured value. That is the only way to reach
+  the ingested corpus.
+- If a search comes back with nothing that answers the question, do NOT run it
+  again. Answer from your own knowledge and say plainly that the documents did
+  not cover it.
 - read_file, write_file and list_files see ONLY the scratch workspace, which
   starts empty. They cannot open an ingested document. Reaching for read_file
   to answer a question about a report will always fail.
 - execute_python runs a real offline sandbox. Write the code as real source
-  with real newlines and print() what you want back.
+  with real newlines and print() what you want back. Use it when a number has
+  to be computed, not to restate arithmetic you can already do.
 
 Rules: one tool per step. Read a tool's observation before deciding the next
 step. If a tool fails, fix your input and try again. When you have enough to
@@ -129,7 +159,20 @@ class AgentLoop:
         # unconstrained decoder, so the malformed-JSON rate can be compared
         # with and without the grammar (acceptance criterion 3).
         grammar_on = os.getenv("AGENT_GRAMMAR", "on").lower() != "off"
-        grammar = build_grammar(self._registry.names()) if grammar_on else None
+        # Tools whose backing service is down for this run. They are dropped
+        # from the grammar, which makes them literally unutterable rather than
+        # merely discouraged -- a dead Docker engine otherwise consumed all of
+        # MAX_TOOL_RETRIES on every task that wanted to run code (measured: 11
+        # of 16 bench failures in one run, every data task among them).
+        unavailable: set[str] = set()
+
+        def current_grammar() -> str | None:
+            if not grammar_on:
+                return None
+            usable = [n for n in self._registry.names() if n not in unavailable]
+            return build_grammar(usable)
+
+        grammar = current_grammar()
         messages: list[dict] = [
             {"role": "system",
              "content": SYSTEM_PROMPT.format(tools=self._registry.prompt_block())},
@@ -175,11 +218,37 @@ class AgentLoop:
             steps_used = step + 1
             yield audited(AgentStep(step=steps_used, max_steps=MAX_STEPS))
 
+            # Token events have to leave this generator WHILE generation is
+            # still running, so generate() runs as a task and its on_token
+            # callback feeds a queue we drain here. Awaiting generate() first
+            # and chunking the finished text afterwards is what made
+            # time-to-first-token equal total latency -- 20 s of blank screen
+            # on a 20 s request, measured.
+            token_q: asyncio.Queue = asyncio.Queue()
+            done_marker = object()
+
+            async def _runner():
+                try:
+                    return await self._llm.generate(
+                        messages, model_id=model_id, grammar=grammar,
+                        expect_json=True, emit=collect_swap,
+                        on_token=token_q.put,
+                    )
+                finally:
+                    await token_q.put(done_marker)
+
+            gen_task = asyncio.create_task(_runner())
+            while True:
+                item = await token_q.get()
+                if item is done_marker:
+                    break
+                # model.loading / model.ready were queued by ensure() before a
+                # single token existed; they must precede them on the wire.
+                while swap_events:
+                    yield swap_events.pop(0)
+                yield audited(Token(text=item))
             try:
-                resp = await self._llm.generate(
-                    messages, model_id=model_id, grammar=grammar,
-                    expect_json=True, emit=collect_swap,
-                )
+                resp = await gen_task
             except Exception as exc:
                 yield audited(AgentError(code="LLM_ERROR", message=str(exc)[:300],
                                          recoverable=False))
@@ -200,8 +269,13 @@ class AgentLoop:
 
             if resp.is_final:
                 self._store.add_message(session_id, "assistant", resp.text)
-                for i in range(0, len(resp.text), TOKEN_CHUNK_CHARS):
-                    yield audited(Token(text=resp.text[i:i + TOKEN_CHUNK_CHARS]))
+                if not resp.streamed:
+                    # Nothing reached the UI live: either the model finished in
+                    # the {"tool":"final",...} shape, or the incremental decode
+                    # disagreed with the authoritative parse. Fall back to
+                    # chunking, which is what always used to happen.
+                    for i in range(0, len(resp.text), TOKEN_CHUNK_CHARS):
+                        yield audited(Token(text=resp.text[i:i + TOKEN_CHUNK_CHARS]))
                 yield await finish("final_answer")
                 return
 
@@ -269,6 +343,22 @@ class AgentLoop:
                 yield audited(event)
 
             last_failed[signature] = not result.ok
+            if not result.ok and _is_unavailable(result.error):
+                # The tool cannot work at all right now -- retrying is pure
+                # latency. Drop it for the rest of the run and tell the model
+                # once, plainly, so it answers by another route.
+                unavailable.add(call.name)
+                grammar = current_grammar()
+                self._audit.record("tool.unavailable",
+                                   {"tool": call.name, "error": (result.error or "")[:200]},
+                                   session_id)
+                messages.append({"role": "assistant", "content": resp.raw})
+                messages.append({"role": "user", "content":
+                    f"{call.name} is unavailable for the rest of this task -- its "
+                    f"backing service is down. This is a host fault, not your "
+                    f"input. Do not call it again. Answer using the other tools, "
+                    f"or reason it out and say what you could not verify."})
+                continue
             if result.ok:
                 fail_streak[call.name] = 0
             else:

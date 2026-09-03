@@ -66,6 +66,16 @@ def run_task(client: httpx.Client, endpoint: str, task: dict) -> dict:
     first_token_ms = None
     final_text = ""
     session_id = None
+    # Phase accounting. "Total latency is 30 s" is not a finding you can act
+    # on; "22 s of it is model generation and 3 s is retrieval" is. Every
+    # timestamp is taken from the same SSE stream the UI reads, so what is
+    # measured is what the user actually waits for.
+    elapsed_ms = lambda: int((time.monotonic() - started) * 1000)   # noqa: E731
+    phases: dict = {"tool_ms_by_name": {}}
+    tool_ms_total = 0
+    last_mark_ms = 0          # end of the last thing we could attribute
+    think_ms = 0              # model generating, i.e. not in a tool and not idle
+    tool_started_ms: dict = {}
 
     with client.stream("POST", f"{endpoint}/api/chat", json=payload,
                        timeout=600) as resp:
@@ -79,11 +89,37 @@ def run_task(client: httpx.Client, endpoint: str, task: dict) -> dict:
                 record["routed_task"] = event["task_type"]
                 record["route_confidence"] = event["confidence"]
                 record["route_correct"] = event["task_type"] == task["task_type"]
+                phases["router_ms"] = elapsed_ms()
+                last_mark_ms = phases["router_ms"]
+            elif etype == "model.loading":
+                phases["swap_started_ms"] = elapsed_ms()
             elif etype == "model.ready":
                 record["swap_load_ms"] = event["load_ms"]
+                phases["model_ready_ms"] = elapsed_ms()
+                last_mark_ms = phases["model_ready_ms"]
+            elif etype == "tool.call":
+                # Everything since the last mark was the model deciding.
+                now = elapsed_ms()
+                think_ms += max(0, now - last_mark_ms)
+                # tool.result carries only call_id per the contract, so the
+                # name has to be remembered from the call.
+                tool_started_ms[event["call_id"]] = (now, event["name"])
+            elif etype == "tool.result":
+                now = elapsed_ms()
+                started_at, name = tool_started_ms.pop(event["call_id"], (now, "unknown"))
+                # duration_ms is the tool's own view; the wall-clock gap also
+                # covers transport, which is the part the user waits through.
+                wall = max(0, now - started_at)
+                tool_ms_total += wall
+                phases["tool_ms_by_name"][name] = (
+                    phases["tool_ms_by_name"].get(name, 0) + wall)
+                last_mark_ms = now
             elif etype == "token":
                 if first_token_ms is None:
-                    first_token_ms = int((time.monotonic() - started) * 1000)
+                    first_token_ms = elapsed_ms()
+                    think_ms += max(0, first_token_ms - last_mark_ms)
+                    last_mark_ms = first_token_ms
+                    phases["first_token_ms"] = first_token_ms
                 final_text += event["text"]
             elif etype == "done":
                 record.update(
@@ -96,6 +132,20 @@ def run_task(client: httpx.Client, endpoint: str, task: dict) -> dict:
 
     record["ttft_ms"] = first_token_ms
     record["final_chars"] = len(final_text)
+    total = elapsed_ms()
+    # gen_ms is time spent streaming the answer AFTER the first token. Today
+    # that is near zero and it is not good news: the loop buffers the whole
+    # grammar-wrapped answer and only then chunks it into token events, so the
+    # user waits out the entire generation with nothing on screen. When real
+    # streaming lands, ttft_ms should collapse and gen_ms should grow.
+    phases["gen_ms"] = max(0, total - first_token_ms) if first_token_ms else 0
+    phases["tool_ms_total"] = tool_ms_total
+    phases["think_ms"] = think_ms
+    phases["total_ms"] = total
+    phases["unaccounted_ms"] = max(
+        0, total - tool_ms_total - think_ms - phases["gen_ms"]
+        - record.get("swap_load_ms", 0))
+    record["phases"] = phases
     expect = task.get("expect", "")
     if expect:
         record["success"] = bool(re.search(expect, final_text, re.IGNORECASE))

@@ -1,0 +1,76 @@
+{
+  "ts": 1788455095,
+  "endpoint": "http://localhost:8000",
+  "tasks_run": 2,
+  "success_rate": 0.5,
+  "route_accuracy": 1.0,
+  "malformed_total": 0,
+  "avg_latency_ms": 13974,
+  "results": [
+    {
+      "id": "gen-01",
+      "task_type": "general",
+      "prompt": "What is the purpose of a flare stack in a refinery? Answer in two sentences.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "general",
+      "route_confidence": 0.6714,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 5,
+      "tokens_in": 6501,
+      "tokens_out": 194,
+      "latency_ms": 20076,
+      "ttft_ms": 20085,
+      "final_chars": 318,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 5065,
+          "read_document": 468
+        },
+        "router_ms": 14,
+        "first_token_ms": 20085,
+        "gen_ms": 7,
+        "tool_ms_total": 5533,
+        "think_ms": 14538,
+        "total_ms": 20092,
+        "unaccounted_ms": 14
+      },
+      "success": true,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-01",
+      "task_type": "document",
+      "prompt": "Search the indexed documents for the pump startup procedure and summarize its precondition checks with citations.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.6041,
+      "route_correct": true,
+      "errors": [
+        "LOOP_DETECTED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 3603,
+      "tokens_out": 81,
+      "latency_ms": 7873,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 678
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 678,
+        "think_ms": 1832,
+        "total_ms": 7882,
+        "unaccounted_ms": 5372
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    }
+  ]
+}

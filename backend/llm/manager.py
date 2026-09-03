@@ -268,6 +268,15 @@ class ModelManager:
         # parser swallow whatever follows, which is --mmproj for the vision
         # model -- so always pass the value explicitly.
         args += ["--flash-attn", "on" if spec.flash_attn else "off"]
+        # One slot, not the auto-chosen four. The agent re-sends a growing
+        # conversation on every step (measured: 1725 prompt tokens at step 1,
+        # 3191 by step 3), so what matters is that the next step lands on the
+        # slot still holding the previous step's KV cache. Four slots split the
+        # budget and let a request land on a cold one. Single-user demo box.
+        args += ["--parallel", "1"]
+        # Reuse cached KV across a prefix that shifted rather than reprocessing
+        # it -- exactly the compaction / observation-append case.
+        args += ["--cache-reuse", "256"]
         if spec.mmproj:
             args += ["--mmproj", str(self._model_path(spec.mmproj))]
         env = os.environ.copy()
