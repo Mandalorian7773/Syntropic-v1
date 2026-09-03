@@ -211,6 +211,10 @@ RERANK_ENABLED = _flag("RAG_RERANK", False)
 # Consumed by a 7B model with a 16K window. One unbounded tool result poisons
 # the context and the agent fails three steps later for no visible reason.
 TOOL_TOKEN_BUDGET = _int("RAG_TOOL_TOKEN_BUDGET", 1000)
+# Budget for read_document when the caller names specific pages. Sized to one
+# scanned page so a table is never cut mid-row; matches the gateway's
+# AGENT_MAX_CONTENT_TOKENS default. See ReadDocument.run for the measured case.
+READ_PAGE_TOKEN_BUDGET = _int("RAG_READ_PAGE_TOKEN_BUDGET", 2500)
 
 # --- Deliverables -----------------------------------------------------------
 ORG_NAME = os.getenv("RAG_ORG_NAME", "Mangalore Refinery and Petrochemicals Limited")

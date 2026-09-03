@@ -150,10 +150,19 @@ class RemoteTool(Tool):
 
     def run(self, args: BaseModel, ctx: RunContext) -> ToolResult:
         started = time.monotonic()
+        payload = args.model_dump()
+        if self.name == "search_documents":
+            # Floor top_k. The model asked for top_k=1, got a single chunk
+            # that opened with the TAIL of a table (PSV-2105's row, 16.4 barg)
+            # followed by prose about PSV-2103, and reported 16.4 as PSV-2103's
+            # set pressure. The row that actually names PSV-2103 sits in the
+            # neighbouring chunk. One hit is never enough to ground a number;
+            # five costs nothing extra -- the reranker already scores 30.
+            payload["top_k"] = max(int(payload.get("top_k") or 5), 5)
         try:
             resp = httpx.post(
                 f"{self.endpoint}/tools/{self.name}",
-                json={"args": args.model_dump(), "session_id": ctx.session_id},
+                json={"args": payload, "session_id": ctx.session_id},
                 timeout=60,
             )
             resp.raise_for_status()

@@ -221,6 +221,35 @@ def reindex(doc_id: str) -> ReindexResponse:
 # --- search -----------------------------------------------------------------
 
 
+class EmbedRequest(BaseModel):
+    texts: list[str] = Field(min_length=1, max_length=256)
+
+
+class EmbedResponse(BaseModel):
+    vectors: list[list[float]]
+    dim: int
+
+
+@app.post("/embed", response_model=EmbedResponse)
+def embed(req: EmbedRequest) -> EmbedResponse:
+    """Dense BGE-M3 vectors for the gateway's router.
+
+    The router's primary classifier is LogisticRegression over these vectors
+    (architecture B4); it POSTs here at startup to train and per prompt to
+    classify, and falls back to TF-IDF when this endpoint is missing. It WAS
+    missing, so every routing decision was the fallback -- document questions
+    landed at ~0.4 confidence, under the 0.6 threshold, and the router panel
+    read "falling back to default model" through the whole document demo.
+    Same embedder as indexing, so nothing new loads.
+    """
+    from index.embed import get_embedder  # noqa: PLC0415
+
+    embedder = get_embedder()
+    vectors = embedder.encode(req.texts)
+    return EmbedResponse(vectors=[[float(x) for x in row] for row in vectors],
+                         dim=int(embedder.dim))
+
+
 @app.post("/search", response_model=SearchResponse)
 def search(req: SearchRequest) -> SearchResponse:
     result = run_search(req.query, top_k=req.top_k)

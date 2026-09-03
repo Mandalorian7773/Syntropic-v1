@@ -102,9 +102,65 @@ def startup_selfcheck() -> list[dict]:
     return results
 
 
+WIN_RULE_GROUP = "SIH-airgap"          # created by scripts/airgap-windows.ps1
+_WIN_CACHE_TTL_S = 10.0                # firewall + event-log probes cost ~1 s
+
+
+def _powershell(script: str, timeout: int = 8) -> tuple[int, str]:
+    exe = shutil.which("powershell") or shutil.which("pwsh")
+    if not exe:
+        return 1, ""
+    return _run([exe, "-NoProfile", "-NonInteractive", "-Command", script], timeout=timeout)
+
+
 class NetworkMonitor:
+    """Counters behind /api/network/status.
+
+    Linux: the nftables counters installed by scripts/airgap-nftables.sh.
+    Windows: the Defender Firewall rule group installed by
+    scripts/airgap-windows.ps1, with dropped-connection audit events (5157)
+    counted since startup. Both are read, never assumed -- when neither is in
+    place the endpoint says rules_active=false and the panel shows INACTIVE,
+    which is the truth and is better than a green zero nobody enforced.
+
+    The Windows probes shell out to PowerShell, which is slow (~1 s), and the
+    frontend polls this endpoint continuously; the result is cached for
+    _WIN_CACHE_TTL_S so the poll never stalls the event loop the SSE stream
+    runs on.
+    """
+
     def __init__(self) -> None:
         self.since = int(time.time())
+        self._win_cache: tuple[float, bool, int, int] | None = None
+
+    # --- Windows ---------------------------------------------------------------
+
+    def _windows_probe(self) -> tuple[bool, int, int]:
+        """(rules_active, blocked_total, blocked_dns) from the firewall + Security log."""
+        if self._win_cache is not None:
+            stamp, active, total, dns = self._win_cache
+            if time.monotonic() - stamp < _WIN_CACHE_TTL_S:
+                return active, total, dns
+        since_iso = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(self.since))
+        script = (
+            f"$g = Get-NetFirewallRule -Group '{WIN_RULE_GROUP}' -ErrorAction SilentlyContinue "
+            f"| Where-Object {{ $_.Enabled -eq 'True' -and $_.Direction -eq 'Outbound' }}; "
+            f"$active = if (@($g).Count -gt 0) {{ 1 }} else {{ 0 }}; "
+            f"$ev = @(Get-WinEvent -FilterHashtable @{{LogName='Security'; Id=5157; "
+            f"StartTime=[datetime]'{since_iso}'}} -ErrorAction SilentlyContinue); "
+            f"$dns = @($ev | Where-Object {{ $_.Message -match 'Destination Port:\\s+53\\b' }}).Count; "
+            f"Write-Output \"$active $($ev.Count) $dns\""
+        )
+        code, out = _powershell(script, timeout=8)
+        active, total, dns = False, 0, 0
+        if code == 0:
+            parts = out.strip().split()
+            if len(parts) == 3 and all(p.isdigit() for p in parts):
+                active, total, dns = parts[0] == "1", int(parts[1]), int(parts[2])
+        self._win_cache = (time.monotonic(), active, total, dns)
+        return active, total, dns
+
+    # --- Linux -----------------------------------------------------------------
 
     def _read_counter(self, name: str) -> int | None:
         if not shutil.which("nft"):
@@ -123,6 +179,15 @@ class NetworkMonitor:
         return None
 
     def status(self) -> NetworkStatus:
+        if shutil.which("nft") is None and shutil.which("powershell"):
+            # Windows host: Defender Firewall rule group + WFP audit events.
+            active, total, dns = self._windows_probe()
+            return NetworkStatus(
+                external_packets=total if active else 0,
+                dns_queries=dns if active else 0,
+                since=self.since,
+                rules_active=active,
+            )
         external = self._read_counter("external")
         dns = self._read_counter("dns")
         return NetworkStatus(

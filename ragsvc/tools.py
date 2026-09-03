@@ -368,7 +368,16 @@ class ReadDocument(Tool):
             f"{page['text']}"
             for page in pages
         )
-        content, raw_path = ragbudget.fit(body, f"read-{document['id'][:8]}")
+        # A request that NAMES its pages gets a page-sized budget. Under the
+        # shared 1000-token budget, page 2 of SOP-INSP-014 (a valve register)
+        # was cut at ~911 tokens: "PSV-2103" survived, its "12.5 barg" did not,
+        # and the agent answered with the neighbouring row's 16.4 barg -- a
+        # confident wrong number with a citation attached. The gateway accepts
+        # up to AGENT_MAX_CONTENT_TOKENS (2500) from a tool, so this matches it.
+        # Whole-document reads keep the small budget on purpose: a 20-page
+        # scanned SOP would otherwise swamp the model's context.
+        budget = cfg.READ_PAGE_TOKEN_BUDGET if args.pages else None
+        content, raw_path = ragbudget.fit(body, f"read-{document['id'][:8]}", budget)
         return ToolResult(
             ok=True, content=content, raw_path=raw_path, duration_ms=_timed(started)
         )

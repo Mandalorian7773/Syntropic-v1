@@ -198,3 +198,15 @@
 {"text": "turn these quarterly figures into year on year growth percentages", "task_type": "data"}
 {"text": "how many days of inventory remain given this consumption table", "task_type": "data"}
 {"text": "fit a linear trend to these thickness readings and give the slope per year", "task_type": "data"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What is the set pressure of PSV-2103?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What corrosion allowance was specified for V-1201?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What is the design pressure of vessel V-1201?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "When was PSV-2104 last tested and when is it next due?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What is the minimum required wall thickness for line 8-P-1104?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "Which vessel does PSV-2101 protect?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What was the measured thickness at CML-7 in the 2024 survey?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What did the inspection report conclude about nozzle N1 on V-1201?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What is the test interval for relief valves in sour service?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "Who approved the repair note APR-2023-0088?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What material is line 6-P-2104 fabricated from?"}
+{"text": "summarize the attached standard operating procedure for pump startup", "task_type": "document", "prompt": "What quantity of expansion bellows did the vendor quote for E-2103?"}

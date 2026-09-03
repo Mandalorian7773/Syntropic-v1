@@ -26,13 +26,26 @@ def router(registry, tmp_path_factory):
 
 
 def test_trainset_shape():
-    lines = (REPO_ROOT / "config" / "router_trainset.jsonl").read_text().splitlines()
-    assert len([l for l in lines if l.strip()]) == 200
+    """B4: at least 200 labelled prompts and at least 40 per class.
+
+    A minimum, not an exact count -- the set grows when a class turns out to be
+    under-represented (equipment-tag questions were absent from `document`
+    until every one of them routed as `general` at 0.33 confidence).
+    """
+    import collections
+    import json
+    lines = (REPO_ROOT / "config" / "router_trainset.jsonl").read_text(
+        encoding="utf-8").splitlines()
+    rows = [json.loads(l) for l in lines if l.strip()]
+    assert len(rows) >= 200
+    per_class = collections.Counter(r["task_type"] for r in rows)
+    assert all(n >= 40 for n in per_class.values()), per_class
 
 
 def test_heldout_accuracy_reported_and_sane(router):
     m = router.metrics
-    assert m["train_size"] == 160 and m["test_size"] == 40
+    # A fixed 40-row held-out set; everything else trains.
+    assert m["test_size"] == 40 and m["train_size"] >= 160
     # Two numbers, both honest: fine-grained task label, and whether the
     # confusion would have changed which MODEL served the prompt (the only
     # confusion that costs anything). Current TF-IDF baseline: 0.775 / 0.975.

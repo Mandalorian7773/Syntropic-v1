@@ -126,7 +126,15 @@ class Router:
         vec_train = self._embed(x_train)
         vec_test = self._embed(x_test) if vec_train is not None else None
         if vec_train is not None and vec_test is not None:
-            self._embed_clf = LogisticRegression(max_iter=2000)
+            # C=10, not the default 1.0. BGE-M3 vectors are unit-norm in 1024
+            # dims, and with 160 training rows the default L2 penalty flattens
+            # predict_proba to ~0.33 for the argmax even when the class is
+            # right -- measured: held-out accuracy 0.925, yet every document
+            # question fell under the 0.60 threshold and the panel read
+            # "falling back to default model" through the whole demo. Weaker
+            # regularisation sharpens the probabilities; accuracy is re-measured
+            # on every startup and written to router_metrics.json regardless.
+            self._embed_clf = LogisticRegression(max_iter=4000, C=10.0)
             self._embed_clf.fit(vec_train, y_train)
             embed_acc = accuracy_score(y_test, self._embed_clf.predict(vec_test))
             joblib.dump(self._embed_clf, self._data_dir / "router_embed.pkl")

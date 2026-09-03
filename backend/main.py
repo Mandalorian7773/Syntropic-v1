@@ -146,6 +146,9 @@ async def startup() -> None:
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
+    # The client keeps one pooled connection to llama-server across agent
+    # steps; close it before the server it points at goes away.
+    await llm.aclose()
     manager.shutdown()
     store.close()
 
@@ -347,6 +350,10 @@ _CAPABILITY_BLURB = [
     ("code", "writes and reviews code"),
     ("document", "answers questions from your documents"),
     ("data", "works through tables and numbers"),
+    # `fast` is a picker-only capability: the router never selects it, a user
+    # can. Measured against the 7B it reaches for tools twice as often, so the
+    # blurb says what it is good for rather than pretending it is a default.
+    ("fast", "answers short general questions quickly on the least VRAM"),
     ("general", "general questions and drafting"),
 ]
 
@@ -430,7 +437,11 @@ async def session_detail(session_id: str) -> SessionDetail:
 
 @app.get("/api/network/status", response_model=NetworkStatus)
 async def network_status() -> NetworkStatus:
-    return monitor.status()
+    # to_thread: on Windows the monitor shells out to PowerShell (cached, but
+    # the first probe after the TTL still takes ~1 s), and this endpoint is
+    # polled continuously by the panel. Same lesson as /api/health and
+    # nvidia-smi -- a blocking probe here stalls somebody's token stream.
+    return await asyncio.to_thread(monitor.status)
 
 
 @app.get("/api/audit")
