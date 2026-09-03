@@ -243,43 +243,60 @@ class LLMClient:
         json_mode = expect_json or grammar is not None
         streamer = FinalAnswerStreamer() if (json_mode and on_token and stream) else None
 
-        client = self._http()
-        if stream:
-            async with client.stream("POST", url, json=payload) as resp:
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    data = line[len("data: "):]
-                    if data.strip() == "[DONE]":
-                        break
-                    chunk = json.loads(data)
-                    usage = chunk.get("usage")
-                    if usage:
-                        tokens_in = usage.get("prompt_tokens", 0)
-                        tokens_out = usage.get("completion_tokens", 0)
-                    for choice in chunk.get("choices", []):
-                        piece = (choice.get("delta") or {}).get("content") or ""
-                        if piece:
-                            raw += piece
-                            if not on_token:
+        # One retry, and only if nothing has reached the UI yet. A managed
+        # llama-server is replaced on every model swap and on every gateway
+        # restart; a request that lands in that window used to fail the whole
+        # turn with LLM_ERROR 'All connection attempts failed'. ensure() probes
+        # the endpoint and restarts a dead server, so going back through it
+        # turns a fatal error into a pause. A disconnect AFTER tokens streamed
+        # is not retried -- replaying would show the user the answer twice.
+        for attempt in (1, 2):
+            try:
+                client = self._http()
+                if stream:
+                    async with client.stream("POST", url, json=payload) as resp:
+                        resp.raise_for_status()
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data: "):
                                 continue
-                            if not json_mode:
-                                await on_token(piece)
-                            elif streamer is not None:
-                                # Protocol JSON never goes to the UI raw --
-                                # but the answer INSIDE it can, as it lands.
-                                text = streamer.feed(piece)
-                                if text:
-                                    await on_token(text)
-        else:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
-            raw = body["choices"][0]["message"].get("content") or ""
-            usage = body.get("usage") or {}
-            tokens_in = usage.get("prompt_tokens", 0)
-            tokens_out = usage.get("completion_tokens", 0)
+                            data = line[len("data: "):]
+                            if data.strip() == "[DONE]":
+                                break
+                            chunk = json.loads(data)
+                            usage = chunk.get("usage")
+                            if usage:
+                                tokens_in = usage.get("prompt_tokens", 0)
+                                tokens_out = usage.get("completion_tokens", 0)
+                            for choice in chunk.get("choices", []):
+                                piece = (choice.get("delta") or {}).get("content") or ""
+                                if piece:
+                                    raw += piece
+                                    if not on_token:
+                                        continue
+                                    if not json_mode:
+                                        await on_token(piece)
+                                    elif streamer is not None:
+                                        # Protocol JSON never goes to the UI raw --
+                                        # but the answer INSIDE it can, as it lands.
+                                        text = streamer.feed(piece)
+                                        if text:
+                                            await on_token(text)
+                else:
+                    resp = await client.post(url, json=payload)
+                    resp.raise_for_status()
+                    body = resp.json()
+                    raw = body["choices"][0]["message"].get("content") or ""
+                    usage = body.get("usage") or {}
+                    tokens_in = usage.get("prompt_tokens", 0)
+                    tokens_out = usage.get("completion_tokens", 0)
+                break
+            except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError):
+                if attempt == 2 or raw:
+                    raise
+                if streamer is not None:
+                    streamer = FinalAnswerStreamer()
+                await self._manager.ensure(target, emit)
+
 
         if not tokens_in:
             tokens_in = sum(len(str(m.get("content", ""))) for m in messages) // 4

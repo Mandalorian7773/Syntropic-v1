@@ -19,6 +19,7 @@ host path of the workspace dir (compose sets it; bare-metal dev needs nothing).
 from __future__ import annotations
 
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -68,6 +69,24 @@ def _docker_client(docker, DockerException):
     raise DockerException(last)
 
 
+_FENCE = re.compile(r"^\s*```[a-zA-Z0-9_+-]*[ \t]*\r?\n(.*?)\r?\n?\s*```\s*$", re.S)
+
+
+def _strip_fence(code: str) -> str:
+    """Remove a markdown code fence wrapped around the whole script.
+
+    The answer-style rule tells the model to present code in a ```python
+    block, and it generalised that to the tool argument: script.py began with
+    a literal ```python, Python raised SyntaxError on line 1, and the model
+    resent the identical code three times because the error message did not
+    tell it what was wrong -- TOOL_RETRIES_EXCEEDED for a program that was
+    correct. Only a fence around the ENTIRE script is stripped; a fence inside
+    a string literal is left alone.
+    """
+    m = _FENCE.match(code)
+    return m.group(1) if m else code
+
+
 def _denature_escapes(code: str) -> str:
     r"""Turn a literal two-character \n back into a newline.
 
@@ -114,7 +133,8 @@ class ExecutePythonTool(Tool):
         run_id = uuid.uuid4().hex[:12]
         run_dir = Path(ctx.workspace_dir) / ".runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "script.py").write_text(_denature_escapes(args.code), encoding="utf-8")
+        (run_dir / "script.py").write_text(_strip_fence(_denature_escapes(args.code)),
+                                           encoding="utf-8")
 
         host_workspace = os.getenv("SANDBOX_HOST_WORKSPACE", "")
         if host_workspace:
