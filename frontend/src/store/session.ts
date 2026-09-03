@@ -216,15 +216,25 @@ export const useSession = create<SessionState>((set, get) => ({
       );
       return;
     }
+    // A turn that ended in error / max_steps / cancelled is stored by the
+    // backend as an assistant row beginning "[stopped: <reason>] ...", because
+    // without it the reopened session showed the question and nothing under
+    // it -- "history isn't saved". Lift that marker into stopReason so the
+    // bubble renders the same "stopped: …" badge a live run gets.
+    const STOPPED = /^\[stopped: (final_answer|max_steps|error|cancelled)\]\s*/;
     const messages: ChatMessage[] = detail.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m, i) => ({
-        id: `${id}-${i}`,
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        citations: [],
-        ts: ((m as { ts?: number }).ts ?? 0) * 1000 || Date.now(),
-      }));
+      .map((m, i) => {
+        const hit = m.role === 'assistant' ? STOPPED.exec(m.content) : null;
+        return {
+          id: `${id}-${i}`,
+          role: m.role as 'user' | 'assistant',
+          content: hit ? m.content.slice(hit[0].length) : m.content,
+          ...(hit ? { stopReason: hit[1] as StopReason } : {}),
+          citations: [],
+          ts: (m.ts ?? 0) * 1000 || Date.now(),
+        };
+      });
     active?.abort();
     active = null;
     set({

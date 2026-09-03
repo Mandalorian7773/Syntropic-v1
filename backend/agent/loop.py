@@ -243,11 +243,28 @@ class AgentLoop:
         tokens_in = tokens_out = 0
         steps_used = 0
 
+        # What the transcript keeps when a turn does NOT reach a final answer.
+        # Before this, error / max_steps / cancelled turns stored the user's
+        # question and nothing else, so a reopened session showed a question
+        # with a blank under it and no reason -- three of ten recent sessions
+        # looked "unsaved". The marker is what the UI lifts into stopReason.
+        turn_state = {"answer_stored": False, "last_error": ""}
+
         def audited(event: BaseModel) -> BaseModel:
+            if isinstance(event, AgentError):
+                turn_state["last_error"] = f"{event.code}: {event.message}"
             self._audit.event(event, session_id)
             return event
 
         async def finish(stop_reason: str) -> Done:
+            if stop_reason != "final_answer" and not turn_state["answer_stored"]:
+                note = turn_state["last_error"] or {
+                    "max_steps": f"gave up after {MAX_STEPS} steps without a final answer",
+                    "cancelled": "stopped by the user",
+                }.get(stop_reason, stop_reason)
+                self._store.add_message(session_id, "assistant",
+                                        f"[stopped: {stop_reason}] {note}")
+                turn_state["answer_stored"] = True
             return audited(Done(
                 stop_reason=stop_reason,
                 steps_used=steps_used,
@@ -319,6 +336,7 @@ class AgentLoop:
 
             if resp.is_final:
                 self._store.add_message(session_id, "assistant", resp.text)
+                turn_state["answer_stored"] = True
                 if not resp.streamed:
                     # Nothing reached the UI live: either the model finished in
                     # the {"tool":"final",...} shape, or the incremental decode

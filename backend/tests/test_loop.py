@@ -247,3 +247,46 @@ async def test_unavailable_tool_is_dropped_not_retried(ws, registry, store, audi
     # The second request went out with the tool removed from the grammar, so
     # the model cannot utter it again even if it wants to.
     assert "execute_python" not in (llm.requests[-1]["grammar"] or "")
+
+
+async def test_failed_turn_still_leaves_an_assistant_row(ws, registry, store, audit):
+    """A turn that ends in error must not vanish from the transcript.
+
+    Before: error / max_steps / cancelled stored the user's question and
+    nothing else, so a reopened session showed a blank answer with no reason.
+    The stored row carries a "[stopped: <reason>]" marker the UI turns into
+    the same badge a live run shows.
+    """
+    store.ensure_session("s1")
+    store.add_message("s1", "user", "do the thing")
+    same = {"path": "."}
+    llm = FakeLLM([
+        tool_call("list_files", same),
+        tool_call("list_files", same),   # nudged
+        tool_call("list_files", same),   # LOOP_DETECTED -> error
+    ])
+    events = await collect(make_loop(llm, registry, store, audit, ws))
+    assert events[-1].stop_reason == "error"
+    rows = [m for m in store.get_session("s1")["messages"] if m["role"] == "assistant"]
+    assert len(rows) == 1
+    assert rows[0]["content"].startswith("[stopped: error] LOOP_DETECTED")
+
+
+async def test_max_steps_turn_records_why(ws, registry, store, audit):
+    store.ensure_session("s1")
+    llm = FakeLLM([
+        tool_call("write_file", {"path": f"f{i}.txt", "content": str(i)})
+        for i in range(MAX_STEPS)
+    ])
+    events = await collect(make_loop(llm, registry, store, audit, ws))
+    assert events[-1].stop_reason == "max_steps"
+    rows = [m for m in store.get_session("s1")["messages"] if m["role"] == "assistant"]
+    assert rows and rows[-1]["content"].startswith("[stopped: max_steps]")
+
+
+async def test_final_answer_stores_exactly_one_assistant_row(ws, registry, store, audit):
+    store.ensure_session("s1")
+    llm = FakeLLM([final("42")])
+    await collect(make_loop(llm, registry, store, audit, ws))
+    rows = [m for m in store.get_session("s1")["messages"] if m["role"] == "assistant"]
+    assert [m["content"] for m in rows] == ["42"]
