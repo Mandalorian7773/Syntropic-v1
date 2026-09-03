@@ -126,6 +126,32 @@ def _shape_hint(schema: dict, defs: dict, depth: int = 0) -> str:
             "boolean": "bool"}.get(kind, "any")
 
 
+def clamp_to_schema(payload: dict, parameters: dict) -> dict:
+    """Pull numeric arguments inside the bounds the tool's schema declares.
+
+    ragsvc says top_k is 1..20; the model asked for 100 ("list every
+    equipment tag in all of them") and the whole call was rejected with a
+    Pydantic validation error it could not act on, then repeated. A number
+    outside the declared range is a request for "as many as you allow", so
+    clamping is the faithful translation, and one fewer way to burn a step.
+    Only `minimum` / `maximum` are honoured; nothing else is rewritten.
+    """
+    props = (parameters or {}).get("properties", {})
+    out = dict(payload)
+    for name, value in payload.items():
+        spec = props.get(name) or {}
+        if "anyOf" in spec:
+            spec = next((b for b in spec["anyOf"] if b.get("type") != "null"), spec)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        lo, hi = spec.get("minimum"), spec.get("maximum")
+        if lo is not None and value < lo:
+            out[name] = lo
+        if hi is not None and value > hi:
+            out[name] = hi
+    return out
+
+
 class RemoteTool(Tool):
     """A tool that lives in ragsvc. Same contract, executed over HTTP."""
 
@@ -159,6 +185,7 @@ class RemoteTool(Tool):
             # neighbouring chunk. One hit is never enough to ground a number;
             # five costs nothing extra -- the reranker already scores 30.
             payload["top_k"] = max(int(payload.get("top_k") or 5), 5)
+        payload = clamp_to_schema(payload, self.raw_parameters)
         try:
             resp = httpx.post(
                 f"{self.endpoint}/tools/{self.name}",

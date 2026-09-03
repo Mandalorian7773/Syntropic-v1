@@ -181,3 +181,20 @@ def test_prompt_block_shows_nested_shapes_not_just_names():
     assert "sections?: [{heading, body, bullets}]" in block, block
     assert "title: str" in block            # required -> no '?'
     assert "sections?" in block             # optional -> '?'
+
+
+def test_out_of_range_numeric_args_are_clamped_to_the_schema():
+    """top_k=100 against a 1..20 schema used to fail the whole call."""
+    from tools.registry import clamp_to_schema
+
+    params = {"properties": {
+        "query": {"type": "string"},
+        "top_k": {"type": "integer", "minimum": 1, "maximum": 20},
+        "pages": {"anyOf": [{"type": "array"}, {"type": "null"}]},
+        "flag": {"type": "boolean"},
+    }}
+    got = clamp_to_schema({"query": "x", "top_k": 100, "pages": [1], "flag": True}, params)
+    assert got == {"query": "x", "top_k": 20, "pages": [1], "flag": True}
+    assert clamp_to_schema({"top_k": 0}, params)["top_k"] == 1
+    assert clamp_to_schema({"top_k": 7}, params)["top_k"] == 7
+    assert clamp_to_schema({"top_k": 7}, {}) == {"top_k": 7}       # no schema: untouched
