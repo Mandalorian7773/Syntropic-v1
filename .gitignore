@@ -49,3 +49,8 @@ dist/
 # Downloaded datasets (kagglehub etc.). The demo uses the small sample copied
 # into demo/datasets/ by scripts/fetch-pid-symbols.py; the raw download stays out.
 demo/datasets/**/raw/
+
+# Public refinery documents (~46 MB) and Kaggle CSVs: fetched by
+# scripts/fetch-refinery-docs.sh and scripts/fetch-pid-symbols.py, not committed.
+demo/datasets/refinery/
+demo/datasets/refinery-csv/
