@@ -7,7 +7,7 @@
  * The parser is deliberately strict about frame boundaries: a token frame can
  * arrive split across two network chunks, and a naive line-splitter drops it.
  */
-import type { Event } from '../types/events';
+import type { Attachment, Event } from '../types/events';
 import { API_BASE } from './rest';
 
 /** Frames are separated by a blank line; a \r\n server is still legal SSE. */
@@ -26,6 +26,8 @@ export function streamChat(
     message: string;
     /** Run this turn on a chosen model. Omit to let the router decide. */
     model_id?: string | null;
+    /** Staged via /api/upload; an image here routes the turn to vision. */
+    attachments?: Attachment[];
   },
   onEvent: (ev: Event) => void,
   onFatal: (message: string) => void,
@@ -46,6 +48,7 @@ export function streamChat(
         body: JSON.stringify({
           session_id: body.session_id ?? null,
           message: body.message,
+          attachments: body.attachments ?? [],
           ...(body.model_id ? { model_id: body.model_id } : {}),
         }),
         signal: controller.signal,

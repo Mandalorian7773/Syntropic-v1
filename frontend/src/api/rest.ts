@@ -10,7 +10,7 @@
  * edit required" when person 3's backend lands.
  */
 import type {
-  ArtifactInfo, CancelResponse, DocumentInfo, HealthResponse, ModelInfo,
+  ArtifactInfo, Attachment, CancelResponse, DocumentInfo, HealthResponse, ModelInfo,
   NetworkStatus, SessionDetail, SessionSummary, UploadResponse,
 } from '../types/events';
 
@@ -44,6 +44,22 @@ export const cancelChat = (sessionId: string) =>
 
 export const reindex = (docId: string) =>
   post<{ doc_id: string; queued: boolean }>(`/api/documents/${docId}/reindex`);
+
+/**
+ * Stage a chat ATTACHMENT (an image for the vision model). Distinct from
+ * uploadDocument: this does not enter the corpus, it rides on the next chat
+ * request as ChatRequest.attachments so the router's image rule fires and the
+ * vision model actually sees the pixels. Until this existed every image went
+ * through uploadDocument, got OCR'd into text, and "what does this gauge
+ * read?" was answered from the OCR of a dial.
+ */
+export async function uploadAttachment(file: File): Promise<Attachment> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`attach failed -> ${res.status} ${res.statusText}`);
+  return (await res.json()) as Attachment;
+}
 
 export async function uploadDocument(file: File): Promise<UploadResponse> {
   const form = new FormData();

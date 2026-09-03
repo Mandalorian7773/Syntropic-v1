@@ -21,11 +21,17 @@ export default function SessionsRail({ view, onView }: {
   const [list, setList] = useState<SessionSummary[]>([]);
   const [hp, setHp] = useState<HealthResponse | null>(null);
   const clear = useSession((s) => s.clear);
+  const loadSession = useSession((s) => s.loadSession);
   const activeId = useSession((s) => s.sessionId);
+  const phase = useSession((s) => s.phase);
 
   useEffect(() => {
-    void sessions().then(setList).catch(() => setList([]));
-    const poll = () => void health().then(setHp).catch(() => setHp(null));
+    const poll = () => {
+      void health().then(setHp).catch(() => setHp(null));
+      // The list too, so a session that just finished shows up without a
+      // reload -- it used to be fetched once at mount and never again.
+      void sessions().then(setList).catch(() => setList([]));
+    };
     poll();
     const id = setInterval(poll, 5000);
     return () => clearInterval(id);
@@ -78,20 +84,24 @@ export default function SessionsRail({ view, onView }: {
         )}
         {list.map((s) => (
           <li key={s.id}>
-            <div
-              className={`border-l-2 px-2 py-1.5 ${
+            <button
+              type="button"
+              onClick={() => { onView('chat'); void loadSession(s.id); }}
+              disabled={phase !== 'idle'}
+              title={phase !== 'idle' ? 'wait for the current answer to finish' : s.title}
+              className={`w-full border-l-2 px-2 py-1.5 text-left disabled:opacity-50 ${
                 s.id === activeId
                   ? 'border-accent bg-steel-850'
                   : 'border-transparent hover:bg-steel-850'}`}
             >
-              <p className="truncate text-tiny text-steel-300" title={s.title}>
+              <p className="truncate text-tiny text-steel-300">
                 {s.title}
               </p>
               <p className="font-mono text-micro text-steel-600">
                 {new Date(s.created_at * 1000).toLocaleDateString()} ·{' '}
                 {s.message_count} msg
               </p>
-            </div>
+            </button>
           </li>
         ))}
       </ul>

@@ -26,7 +26,12 @@ from index import bm25, qdrant_store
 from index.embed import WeightsMissing, get_embedder
 from ingest.pipeline import IngestResult, ingest_document
 
-SUPPORTED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+SUPPORTED_SUFFIXES = {
+    # rendered + OCR'd via ingest/pipeline.py
+    ".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp",
+    # text-native via ingest/textdoc.py: no renderer, no OCR
+    ".docx", ".txt", ".md", ".csv", ".xlsx",
+}
 
 
 @dataclass

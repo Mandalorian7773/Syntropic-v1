@@ -534,10 +534,11 @@ async def artifact(artifact_id: str):
     return await _proxy("GET", f"/artifacts/{artifact_id}")
 
 
-async def _proxy(method: str, path: str, request: Request | None = None) -> Response:
+async def _proxy(method: str, path: str, request: Request | None = None,
+                 timeout: float = 120) -> Response:
     url = f"{RAG_ENDPOINT}{path}"
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             if request is not None:
                 body = await request.body()
                 upstream = await client.request(
@@ -573,7 +574,13 @@ async def documents(request: Request) -> Response:
 async def documents_upload(request: Request) -> Response:
     # Multipart passes straight through to ragsvc; the SPA only ever talks to
     # this origin (frontend/src/api/rest.ts::uploadDocument).
-    return await _proxy("POST", "/documents/upload", request)
+    #
+    # 900 s, not the proxy's default 120: ragsvc ingests synchronously and OCR
+    # is CPU-bound -- the 20-page scanned SOP in the demo corpus takes several
+    # minutes. At 120 s the gateway gave up and the composer showed "could not
+    # ingest" while ragsvc went on to index the file successfully, so the user
+    # retried and got a duplicate.
+    return await _proxy("POST", "/documents/upload", request, timeout=900)
 
 
 @app.api_route("/api/documents/{doc_id}/reindex", methods=["POST"])

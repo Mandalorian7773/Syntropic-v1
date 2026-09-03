@@ -16,8 +16,21 @@ import { useSession } from '../store/session';
 import type { ChatMessage } from '../store/session';
 import Markdown from '../components/Markdown';
 import { ModelPicker, SwapProgress } from '../components/ModelPicker';
-import { uploadDocument } from '../api/rest';
+import { uploadAttachment, uploadDocument } from '../api/rest';
+import type { Attachment, UploadResponse } from '../types/events';
 import { Dot, ms } from '../components/ui';
+
+/** A file in the composer, from the moment it is picked. */
+interface Pending {
+  key: string;
+  file: File;
+  status: 'reading' | 'ready' | 'failed';
+  /** Set for documents once ingested. */
+  doc?: UploadResponse;
+  /** Set for images once staged; rides on the next chat request. */
+  attachment?: Attachment;
+  error?: string;
+}
 
 export default function ChatView() {
   const messages = useSession((s) => s.messages);
@@ -255,12 +268,45 @@ function Composer() {
 
   const pushError = useSession((s) => s.pushError);
   const [text, setText] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  // Ingest is synchronous and OCR is slow: a scanned page is seconds, a
-  // 20-page scan over a minute. Naming the file being read beats a spinner.
-  const [uploading, setUploading] = useState<string | null>(null);
+  // Files start uploading the moment they are attached, not when Send is
+  // pressed. The previous shape collected them as inert chips and only
+  // uploaded inside submit(), so a user who attached a PDF and looked at the
+  // Documents tab saw nothing there, and a scanned document's minute of OCR
+  // landed on top of the wait for the answer. Now the chip shows reading /
+  // ready / failed as it happens, and by the time the question is typed the
+  // document is usually already indexed.
+  const [pending, setPending] = useState<Pending[]>([]);
+  const uploading = pending.find((p) => p.status === 'reading')?.file.name ?? null;
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+
+  function attach(files: File[]) {
+    const items: Pending[] = files.map((file) => ({
+      key: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+      file,
+      status: 'reading',
+    }));
+    setPending((prev) => [...prev, ...items]);
+    for (const item of items) {
+      const isImage = item.file.type.startsWith('image/');
+      (isImage ? uploadAttachment(item.file) : uploadDocument(item.file))
+        .then((result) =>
+          setPending((prev) => prev.map((p) => p.key !== item.key ? p : {
+            ...p,
+            status: 'ready',
+            ...(isImage
+              ? { attachment: result as Attachment }
+              : { doc: result as UploadResponse }),
+          })))
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          setPending((prev) => prev.map((p) => p.key !== item.key ? p : {
+            ...p, status: 'failed', error: message,
+          }));
+          pushError(`could not attach ${item.file.name}: ${message}`, 'UPLOAD');
+        });
+    }
+  }
 
   // Grow with content up to a ceiling, so a long prompt does not eat the chat.
   useEffect(() => {
@@ -279,34 +325,26 @@ function Composer() {
     // a corpus the PDF had never entered, and the agent answered about the
     // other documents instead. Ingesting first is what makes the file
     // reachable by search_documents and read_document at all.
-    let preamble = '';
-    if (files.length > 0) {
-      const ingested: string[] = [];
-      for (const file of files) {
-        setUploading(file.name);
-        try {
-          const doc = await uploadDocument(file);
-          ingested.push(`${doc.filename} (${doc.pages} page${doc.pages === 1 ? '' : 's'})`);
-        } catch (err) {
-          setUploading(null);
-          pushError(
-            `could not ingest ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
-            'UPLOAD',
-          );
-          return; // keep the chips and the text so the send can be retried
-        }
-      }
-      setUploading(null);
-      // Name the file in the message. "Summarise it" is unanswerable against a
-      // nine-document corpus; the model needs to know which one just arrived.
-      preamble =
-        `[The user has just uploaded and ingested: ${ingested.join(', ')}. ` +
-        `Use search_documents or read_document on it to answer.]\n\n`;
-    }
+    // Two kinds of file, two destinations, both already uploaded by attach().
+    // An IMAGE rides on this request as ChatRequest.attachments, so the
+    // router's image rule sends the turn to the vision model, which looks at
+    // the pixels. A DOCUMENT (PDF, DOCX, TXT, MD, CSV, XLSX) was ingested into
+    // the corpus, so search_documents and read_document can reach it; it is
+    // named in the message because "summarise it" is unanswerable against a
+    // nine-document corpus. Failed items are left out and stay as red chips.
+    const ready = pending.filter((p) => p.status === 'ready');
+    const attachments = ready.flatMap((p) => (p.attachment ? [p.attachment] : []));
+    const ingested = ready.flatMap((p) => p.doc
+      ? [`${p.doc.filename} (${p.doc.pages} page${p.doc.pages === 1 ? '' : 's'})`]
+      : []);
+    const preamble = ingested.length > 0
+      ? `[The user has just uploaded and ingested: ${ingested.join(', ')}. ` +
+        `Use search_documents or read_document on it to answer.]\n\n`
+      : '';
 
-    send(preamble + text);
+    send(preamble + text, attachments);
     setText('');
-    setFiles([]);
+    setPending((prev) => prev.filter((p) => p.status === 'failed'));
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -319,19 +357,26 @@ function Composer() {
 
   return (
     <div className="shrink-0 border-t border-steel-800 bg-steel-900 p-3">
-      {files.length > 0 && (
+      {pending.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-1.5">
-          {files.map((f, i) => (
-            <li key={`${f.name}-${i}`}
-                className="flex items-center gap-1.5 border border-steel-700
-                           bg-steel-850 px-2 py-0.5 font-mono text-tiny
-                           text-steel-300">
-              {f.name}
+          {pending.map((p) => (
+            <li key={p.key}
+                title={p.error ?? (p.doc ? `${p.doc.pages} page(s) indexed` : p.attachment ? 'attached for the vision model' : 'reading…')}
+                className={`flex items-center gap-1.5 border px-2 py-0.5 font-mono
+                            text-tiny ${
+                  p.status === 'failed' ? 'border-fault-dim bg-fault-deep text-fault'
+                  : p.status === 'ready' ? 'border-accent-dim bg-steel-850 text-steel-200'
+                  : 'border-steel-700 bg-steel-850 text-steel-400'}`}>
+              <span className={p.status === 'reading' ? 'animate-pulse-slow' : ''}>
+                {p.status === 'reading' ? '◌' : p.status === 'ready' ? (p.attachment ? '▣' : '✓') : '!'}
+              </span>
+              {p.file.name}
+              {p.doc && <span className="text-steel-500">· {p.doc.pages}p</span>}
               <button
                 type="button"
-                onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                onClick={() => setPending((prev) => prev.filter((q) => q.key !== p.key))}
                 className="text-steel-600 hover:text-fault"
-                aria-label={`remove ${f.name}`}
+                aria-label={`remove ${p.file.name}`}
               >
                 ×
               </button>
@@ -345,9 +390,10 @@ function Composer() {
           ref={picker}
           type="file"
           multiple
+          accept=".pdf,.docx,.txt,.md,.csv,.xlsx,image/*"
           className="hidden"
           onChange={(e) => {
-            setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])]);
+            attach(Array.from(e.target.files ?? []));
             e.target.value = '';
           }}
         />
@@ -408,7 +454,7 @@ function Composer() {
         <p className="font-mono text-micro text-steel-600">
           {uploading
             ? `reading ${uploading} — OCR runs on CPU, a scanned page takes a few seconds`
-            : 'Enter to send · Shift+Enter for a newline · attach a PDF to ask about it'}
+            : 'Enter to send · Shift+Enter for a newline · attach a PDF/DOCX/XLSX to ask about it, or an image to have it read'}
         </p>
       </div>
     </div>

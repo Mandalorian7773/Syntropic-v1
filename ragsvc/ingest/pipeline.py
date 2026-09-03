@@ -171,6 +171,22 @@ def ingest_document(
         workers=workers,
     )
 
+    # Text-native formats never touch the renderer or OCR: .docx, .txt, .md,
+    # .csv, .xlsx become pages directly. Same PageResult/Block shape, same
+    # chunker, same citations -- the rest of the service cannot tell.
+    from .textdoc import TEXT_SUFFIXES, pages_from_text_document  # noqa: PLC0415
+
+    if path.suffix.lower() in TEXT_SUFFIXES:
+        result.pages = pages_from_text_document(path)
+        result.native_pages = len(result.pages)
+        _carry_sections(result.pages)
+        all_blocks = [b for page in result.pages for b in page.blocks]
+        result.chunks = chunk_blocks(all_blocks, doc_id, filename)
+        if on_page:
+            on_page(len(result.pages), len(result.pages))
+        result.duration_ms = int((time.monotonic() - started) * 1000)
+        return result
+
     document = pdf.open_document(path)
     try:
         total = document.page_count

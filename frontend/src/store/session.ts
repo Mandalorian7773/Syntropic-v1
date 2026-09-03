@@ -10,9 +10,10 @@
  */
 import { create } from 'zustand';
 import type {
-  Artifact, Citation, Event, ModelInfo, RouterDecision, StopReason, TaskType,
+  Attachment,
+  Artifact, Citation, Event, ModelInfo, RouterDecision, SessionDetail, StopReason, TaskType,
 } from '../types/events';
-import { cancelChat, models as fetchModels } from '../api/rest';
+import { cancelChat, models as fetchModels, session as fetchSession } from '../api/rest';
 import { streamChat } from '../api/sse';
 
 // --- view models -----------------------------------------------------------
@@ -85,9 +86,16 @@ interface SessionState {
   /** null means "let the router choose", which is the default behaviour. */
   selectedModel: string | null;
   // actions
-  send: (message: string) => void;
+  send: (message: string, attachments?: Attachment[]) => void;
   stop: () => void;
   clear: () => void;
+  /**
+   * Open a stored session: its transcript replaces the current one and the
+   * next message continues it (session_id rides on the chat request). The rail
+   * listed sessions from day one but nothing loaded them, so "old sessions"
+   * were visible and unreachable.
+   */
+  loadSession: (id: string) => Promise<void>;
   /** Surface a client-side failure in the same place stream errors appear. */
   pushError: (message: string, code?: string) => void;
   loadModels: () => void;
@@ -125,7 +133,7 @@ export const useSession = create<SessionState>((set, get) => ({
   ...EMPTY,
   ...MODEL_DEFAULTS,
 
-  send(message: string) {
+  send(message: string, attachments: Attachment[] = []) {
     const text = message.trim();
     if (!text || get().phase !== 'idle') return;
 
@@ -150,6 +158,7 @@ export const useSession = create<SessionState>((set, get) => ({
       {
         session_id: get().sessionId,
         message: text,
+        attachments,
         // Omitted entirely when nothing is picked, so the request is byte for
         // byte what it was before the picker existed and the router behaves
         // exactly as it did.
@@ -193,6 +202,38 @@ export const useSession = create<SessionState>((set, get) => ({
     active?.abort();
     active = null;
     set({ ...EMPTY });
+  },
+
+  async loadSession(id: string) {
+    if (get().phase !== 'idle') return;           // never yank a live stream
+    let detail: SessionDetail;
+    try {
+      detail = await fetchSession(id);
+    } catch (err) {
+      get().pushError(
+        `could not open session: ${err instanceof Error ? err.message : String(err)}`,
+        'SESSION',
+      );
+      return;
+    }
+    const messages: ChatMessage[] = detail.messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m, i) => ({
+        id: `${id}-${i}`,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        citations: [],
+        ts: ((m as { ts?: number }).ts ?? 0) * 1000 || Date.now(),
+      }));
+    active?.abort();
+    active = null;
+    set({
+      ...EMPTY,
+      sessionId: id,
+      messages,
+      // A pinned session stays on its model; the picker reflects that.
+      selectedModel: detail.model_id ?? get().selectedModel,
+    });
   },
 
   pushError(message: string, code = 'CLIENT') {

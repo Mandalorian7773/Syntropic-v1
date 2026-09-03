@@ -45,3 +45,7 @@ dist/
 
 # Dev server logs from `make dev-*` / uvicorn redirects.
 *.log
+
+# Downloaded datasets (kagglehub etc.). The demo uses the small sample copied
+# into demo/datasets/ by scripts/fetch-pid-symbols.py; the raw download stays out.
+demo/datasets/**/raw/

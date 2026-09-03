@@ -73,9 +73,10 @@ def test_reindexing_an_unknown_document_is_404(client):
 
 
 def test_unsupported_file_types_are_refused(client):
+    # .txt became a supported (text-native) type; a zip is not a document.
     response = client.post(
         "/documents/upload",
-        files={"file": ("notes.txt", b"plain text", "text/plain")},
+        files={"file": ("archive.zip", b"PK\x03\x04", "application/zip")},
     )
     assert response.status_code == 415
 
