@@ -16,6 +16,7 @@ import { useSession } from '../store/session';
 import type { ChatMessage } from '../store/session';
 import Markdown from '../components/Markdown';
 import { ModelPicker, SwapProgress } from '../components/ModelPicker';
+import { uploadDocument } from '../api/rest';
 import { Dot, ms } from '../components/ui';
 
 export default function ChatView() {
@@ -252,8 +253,12 @@ function Composer() {
   const phase = useSession((s) => s.phase);
   const busy = phase !== 'idle';
 
+  const pushError = useSession((s) => s.pushError);
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  // Ingest is synchronous and OCR is slow: a scanned page is seconds, a
+  // 20-page scan over a minute. Naming the file being read beats a spinner.
+  const [uploading, setUploading] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
 
@@ -265,9 +270,41 @@ function Composer() {
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [text]);
 
-  function submit() {
-    if (busy || !text.trim()) return;
-    send(text);
+  async function submit() {
+    if (busy || uploading || !text.trim()) return;
+
+    // Attached files are INGESTED before the message goes, not carried with
+    // it. Until now they were collected into state, shown as chips, and then
+    // dropped on the floor by setFiles([]) -- so "summarise this PDF" reached
+    // a corpus the PDF had never entered, and the agent answered about the
+    // other documents instead. Ingesting first is what makes the file
+    // reachable by search_documents and read_document at all.
+    let preamble = '';
+    if (files.length > 0) {
+      const ingested: string[] = [];
+      for (const file of files) {
+        setUploading(file.name);
+        try {
+          const doc = await uploadDocument(file);
+          ingested.push(`${doc.filename} (${doc.pages} page${doc.pages === 1 ? '' : 's'})`);
+        } catch (err) {
+          setUploading(null);
+          pushError(
+            `could not ingest ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+            'UPLOAD',
+          );
+          return; // keep the chips and the text so the send can be retried
+        }
+      }
+      setUploading(null);
+      // Name the file in the message. "Summarise it" is unanswerable against a
+      // nine-document corpus; the model needs to know which one just arrived.
+      preamble =
+        `[The user has just uploaded and ingested: ${ingested.join(', ')}. ` +
+        `Use search_documents or read_document on it to answer.]\n\n`;
+    }
+
+    send(preamble + text);
     setText('');
     setFiles([]);
   }
@@ -354,14 +391,14 @@ function Composer() {
           <button
             type="button"
             onClick={submit}
-            disabled={!text.trim()}
+            disabled={!text.trim() || uploading !== null}
             className="h-9 shrink-0 border border-accent-dim bg-accent-deep px-4
                        font-mono text-tiny uppercase tracking-widest text-accent
                        hover:bg-accent hover:text-steel-950
                        disabled:opacity-30 disabled:hover:bg-accent-deep
                        disabled:hover:text-accent"
           >
-            Send
+            {uploading ? 'Reading…' : 'Send'}
           </button>
         )}
       </div>
@@ -369,7 +406,9 @@ function Composer() {
       <div className="mt-1.5 flex items-center gap-2">
         <ModelPicker />
         <p className="font-mono text-micro text-steel-600">
-          Enter to send · Shift+Enter for a newline
+          {uploading
+            ? `reading ${uploading} — OCR runs on CPU, a scanned page takes a few seconds`
+            : 'Enter to send · Shift+Enter for a newline · attach a PDF to ask about it'}
         </p>
       </div>
     </div>

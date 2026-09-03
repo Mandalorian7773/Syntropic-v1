@@ -80,6 +80,24 @@ DB_PATH = os.getenv("DB_PATH", str(ROOT / "data" / "workbench.db"))
 DATA_DIR = str(Path(DB_PATH).parent)
 AIRGAP_ENFORCE = os.getenv("AIRGAP_ENFORCE", "0") == "1"
 
+# Whether the agent may RUN code, as opposed to writing it.
+#
+#   0     (default) write code, never execute it
+#   1     register execute_python unconditionally
+#   auto  register it only if the Docker engine actually answers
+#
+# Default off, because a tool that is offered and then fails is worse than a
+# tool that was never offered. Observed on a host without Docker: the model
+# called execute_python, got "sandbox unavailable", ignored the instruction not
+# to retry, reached for read_file instead, repeated it, and the loop detector
+# killed the turn -- five wasted steps and a fatal error for a question it
+# could have answered by writing four lines. Removing the tool removes the
+# temptation; nothing else in the loop had to change.
+#
+# Set AGENT_SANDBOX=1 (or auto) on a host with a working sandbox to get the
+# sandboxed-execution demonstration back.
+AGENT_SANDBOX = os.getenv("AGENT_SANDBOX", "0").strip().lower()
+
 app = FastAPI(title="SIH26117 backend", version="0.1.0")
 
 store: Store
@@ -128,10 +146,38 @@ async def startup() -> None:
     llm = LLMClient(manager)
 
     registry = Registry()
-    for tool in (ReadFileTool(), WriteFileTool(), ListFilesTool(), ExecutePythonTool()):
+    for tool in (ReadFileTool(), WriteFileTool(), ListFilesTool()):
         registry.register(tool)
+
+    # Withdrawing write_file was tried here and did not work. Asked for code
+    # with no sandbox, the model wrote 2_sum.py and answered "2_sum.py has been
+    # created"; with write_file gone too, it reached for create_docx three
+    # times and died on TOOL_RETRIES_EXCEEDED. Taking tools away only moves the
+    # behaviour to the next tool that makes a file. "Show the code, do not file
+    # it" is an instruction, so it lives in SYSTEM_PROMPT instead.
+    sandbox_reason = "disabled by AGENT_SANDBOX=0; the agent writes code, it does not run it"
+    if AGENT_SANDBOX in {"1", "true", "yes", "on"}:
+        registry.register(ExecutePythonTool())
+        sandbox_reason = "enabled by AGENT_SANDBOX"
+    elif AGENT_SANDBOX == "auto":
+        # Probe rather than assume. sandbox.py only discovers a dead engine at
+        # call time, which is exactly when it is most expensive to find out.
+        try:
+            import docker  # noqa: PLC0415
+            from docker.errors import DockerException  # noqa: PLC0415
+
+            from tools.sandbox import _docker_client  # noqa: PLC0415
+
+            _docker_client(docker, DockerException).ping()
+            registry.register(ExecutePythonTool())
+            sandbox_reason = "auto: docker engine answered"
+        except Exception as exc:  # noqa: BLE001
+            sandbox_reason = f"auto: docker unreachable ({type(exc).__name__}); not registered"
+
     remote = registry.register_remote(RAG_ENDPOINT)
-    audit.record("startup.tools", {"registered": registry.names(), "remote": remote})
+    audit.record("startup.tools", {"registered": registry.names(), "remote": remote,
+                                   "sandbox": sandbox_reason})
+    print(f"tools: {', '.join(registry.names())}  [sandbox: {sandbox_reason}]", flush=True)
 
     router = Router(model_registry, RAG_ENDPOINT,
                     str(ROOT / "config" / "router_trainset.jsonl"), DATA_DIR)

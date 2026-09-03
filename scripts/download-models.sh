@@ -25,6 +25,12 @@ for m in doc.get("models", []):
     print("\t".join(str(m.get(k, "")) for k in ("id", "repo", "filename", "sha256", "size_bytes")))
 PYEOF
 )"
+# Strip carriage returns. Python's print writes CRLF on Windows, so the LAST
+# tab-separated field on every row arrives as "4683072032\r" -- and the size
+# comparison below then fails against a byte-perfect download whose sha256
+# just matched. The failure blames the file and points at the network; the
+# cause is a line ending. The sha field escapes it only by not being last.
+ROWS="${ROWS//$'\r'/}"
 
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
@@ -49,13 +55,23 @@ while IFS=$'\t' read -r id repo filename sha size; do
   if [ -f "$target" ]; then
     echo "download-models: $id already present, verifying ..."
   else
-    if ! command -v huggingface-cli >/dev/null 2>&1; then
-      echo "download-models: huggingface-cli not found. Install it on the CONNECTED"
+    # `hf` first: huggingface_hub 1.x REMOVED huggingface-cli. It is still on
+    # PATH, still exits 0 from `command -v`, and then prints "no longer works"
+    # and fails -- so probing for the old name finds a binary that cannot
+    # download. Older hubs only have huggingface-cli, hence both.
+    if command -v hf >/dev/null 2>&1; then
+      fetch=(hf download "$repo" "$filename" --local-dir "$DEST")
+    elif command -v huggingface-cli >/dev/null 2>&1; then
+      # --local-dir-use-symlinks was dropped in hub 1.x; only pass it here.
+      fetch=(huggingface-cli download "$repo" "$filename" --local-dir "$DEST"
+             --local-dir-use-symlinks False)
+    else
+      echo "download-models: no Hugging Face CLI found. Install it on the CONNECTED"
       echo "                 machine only: pip install 'huggingface_hub[cli]'"
       exit 1
     fi
     echo "download-models: fetching $id from $repo ..."
-    huggingface-cli download "$repo" "$filename" --local-dir "$DEST" --local-dir-use-symlinks False
+    "${fetch[@]}"
   fi
 
   actual="$(sha256_of "$target")"

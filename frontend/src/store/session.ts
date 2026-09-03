@@ -88,6 +88,8 @@ interface SessionState {
   send: (message: string) => void;
   stop: () => void;
   clear: () => void;
+  /** Surface a client-side failure in the same place stream errors appear. */
+  pushError: (message: string, code?: string) => void;
   loadModels: () => void;
   selectModel: (modelId: string | null) => void;
 }
@@ -191,6 +193,12 @@ export const useSession = create<SessionState>((set, get) => ({
     active?.abort();
     active = null;
     set({ ...EMPTY });
+  },
+
+  pushError(message: string, code = 'CLIENT') {
+    set((s) => ({
+      errors: [...s.errors, { code, message, recoverable: true, ts: Date.now() }],
+    }));
   },
 
   loadModels() {
