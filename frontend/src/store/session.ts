@@ -10,9 +10,9 @@
  */
 import { create } from 'zustand';
 import type {
-  Artifact, Citation, Event, RouterDecision, StopReason, TaskType,
+  Artifact, Citation, Event, ModelInfo, RouterDecision, StopReason, TaskType,
 } from '../types/events';
-import { cancelChat } from '../api/rest';
+import { cancelChat, models as fetchModels } from '../api/rest';
 import { streamChat } from '../api/sse';
 
 // --- view models -----------------------------------------------------------
@@ -80,10 +80,16 @@ interface SessionState {
   citations: Citation[];
   errors: StreamError[];
   lastRun: RunStats | null;
+  // model picker
+  models: ModelInfo[];
+  /** null means "let the router choose", which is the default behaviour. */
+  selectedModel: string | null;
   // actions
   send: (message: string) => void;
   stop: () => void;
   clear: () => void;
+  loadModels: () => void;
+  selectModel: (modelId: string | null) => void;
 }
 
 const EMPTY = {
@@ -103,11 +109,19 @@ const EMPTY = {
   lastRun: null,
 };
 
+// Deliberately outside EMPTY: `clear()` wipes the conversation, not the user's
+// choice of model or the registry we fetched to render it.
+const MODEL_DEFAULTS = {
+  models: [] as ModelInfo[],
+  selectedModel: null as string | null,
+};
+
 /** Live stream handle. Outside the store: it is not state, it is a resource. */
 let active: { abort: () => void } | null = null;
 
 export const useSession = create<SessionState>((set, get) => ({
   ...EMPTY,
+  ...MODEL_DEFAULTS,
 
   send(message: string) {
     const text = message.trim();
@@ -131,7 +145,14 @@ export const useSession = create<SessionState>((set, get) => ({
     }));
 
     active = streamChat(
-      { session_id: get().sessionId, message: text },
+      {
+        session_id: get().sessionId,
+        message: text,
+        // Omitted entirely when nothing is picked, so the request is byte for
+        // byte what it was before the picker existed and the router behaves
+        // exactly as it did.
+        ...(get().selectedModel ? { model_id: get().selectedModel } : {}),
+      },
       (ev) => set((s) => reduce(s, ev)),
       (message: string) =>
         set((s) => ({
@@ -171,6 +192,18 @@ export const useSession = create<SessionState>((set, get) => ({
     active = null;
     set({ ...EMPTY });
   },
+
+  loadModels() {
+    void fetchModels()
+      .then((models) => set({ models }))
+      // A picker that cannot reach /api/models is a disabled picker, not a
+      // crash: the composer still sends, and the router still routes.
+      .catch(() => set({ models: [] }));
+  },
+
+  selectModel(modelId: string | null) {
+    set({ selectedModel: modelId });
+  },
 }));
 
 // --- the reducer -----------------------------------------------------------
@@ -201,6 +234,11 @@ function reduce(s: SessionState, ev: Event): Partial<SessionState> {
         swap: null,
         activeModel: ev.model_id,
         modelVramMb: ev.vram_mb,
+        // The card holds one model at a time, so a ready event is also the
+        // authoritative answer to "which one is resident right now". Keeping
+        // the picker in step here means it never has to re-poll /api/models to
+        // find out what it just watched load.
+        models: s.models.map((m) => ({ ...m, loaded: m.id === ev.model_id })),
       };
 
     case 'agent.step':

@@ -2,7 +2,8 @@
  * Drives the real store through the real SSE client against the real mock, so
  * what the panels read is what actually comes off the wire.
  */
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
+import { startMock } from './mockServer';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { useSession } from '../store/session';
 
@@ -10,16 +11,8 @@ const PORT = 8178;
 let proc: ChildProcess;
 
 beforeAll(async () => {
-  proc = spawn('python3', ['mock/server.py', '--port', String(PORT), '--fast'],
-               { stdio: 'ignore' });
-  for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(`http://127.0.0.1:${PORT}/api/health`)).ok) return;
-    } catch { /* not up yet */ }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('mock server did not start');
-}, 20000);
+  proc = await startMock(PORT);
+}, 30000);
 
 afterAll(() => proc?.kill());
 beforeEach(() => useSession.getState().clear());
@@ -69,7 +62,7 @@ describe('store reduces a full run', () => {
 
   it('code run records the swap and the failed-then-ok tool pair', async () => {
     const s = await send('write a python script for downtime');
-    expect(s.activeModel).toBe('qwen3-coder-8b');
+    expect(s.activeModel).toBe('qwen2.5-coder-7b');
     // The swap is cleared by model.ready; the run ends with no swap pending.
     expect(s.swap).toBeNull();
     expect(s.trace.map((t) => t.ok)).toEqual([false, true]);

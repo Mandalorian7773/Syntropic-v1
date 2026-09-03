@@ -45,6 +45,21 @@ TASK_CAPABILITY = {"general": "general", "code": "code", "document": "document",
                    "vision": "vision", "data": "data"}
 
 
+class ModelChoiceError(ValueError):
+    """A user-chosen model cannot serve this turn.
+
+    Raised instead of quietly routing somewhere else. A picker that silently
+    ignores the pick is worse than one that refuses it: the user believes the
+    answer came from the model they selected, and nothing on screen says
+    otherwise.
+    """
+
+    def __init__(self, message: str, *, model_id: str, reason: str) -> None:
+        super().__init__(message)
+        self.model_id = model_id
+        self.reason = reason  # "unknown" | "incapable"
+
+
 class Router:
     def __init__(self, registry: ModelRegistry, rag_endpoint: str,
                  trainset_path: str, data_dir: str) -> None:
@@ -143,6 +158,67 @@ class Router:
         probs = self._tfidf.predict_proba([prompt])[0]
         idx = int(np.argmax(probs))
         return self._tfidf.named_steps["clf"].classes_[idx], float(probs[idx]), "tf-idf"
+
+    def required_task(self, prompt: str, attachments: list[Attachment]) -> tuple[str, float]:
+        """The task this turn needs, and how sure we are.
+
+        Same two rules `decide` opens with, factored out so the override path
+        judges a user's pick against exactly what the router would have judged
+        it against. A second, parallel notion of "what kind of turn is this"
+        would drift from this one within a week.
+        """
+        if any(a.mime.startswith("image/") for a in attachments):
+            return "vision", 1.0
+        task, confidence, _via = self._classify(prompt)
+        if task == "general" and attachments:
+            task = "document"
+        return task, confidence
+
+    def decide_override(self, model_id: str, prompt: str,
+                        attachments: list[Attachment]) -> RouterDecision:
+        """Honour a user's model choice, or refuse it with a reason.
+
+        Refusal is deliberately narrow. The classifier is a guess with a
+        confidence attached, and `decide` itself does not trust a label below
+        `min_confidence` -- it falls back to the default model rather than
+        acting on it. So an override is refused only where the router would
+        also have treated the requirement as binding:
+
+          * an image is attached and the model has no vision capability. The
+            router calls this a hard rule and so is this: the model physically
+            cannot see the attachment.
+          * the classifier is at or above `min_confidence` that the turn needs
+            a capability the model does not advertise.
+
+        Below that threshold the user's explicit choice wins over a guess the
+        router would not have acted on either. Anything stricter turns a
+        picker into a suggestion box.
+        """
+        spec = self._registry.get(model_id)  # KeyError for an unknown id
+        task, confidence = self.required_task(prompt, attachments)
+        capability = TASK_CAPABILITY[task]
+        binding = task == "vision" or confidence >= self._registry.router.min_confidence
+
+        if binding and capability not in spec.capabilities:
+            capable = sorted(self._registry.with_capability(capability),
+                             key=lambda m: m.vram_mb)
+            suggestion = (f" Try {', '.join(m.id for m in capable)}."
+                          if capable else
+                          f" No configured model advertises {capability!r}.")
+            raise ModelChoiceError(
+                f"{model_id!r} cannot handle this request: it needs the "
+                f"{capability!r} capability and {model_id!r} advertises "
+                f"{sorted(spec.capabilities) or 'none'}.{suggestion}",
+                model_id=model_id, reason="incapable",
+            )
+
+        alternatives = [m.id for m in self._registry.with_capability(capability)
+                        if m.id != model_id]
+        return RouterDecision(
+            model_id=model_id, task_type=task, confidence=1.0,
+            reason=f"user selected {model_id}",
+            alternatives=alternatives,
+        )
 
     def decide(self, prompt: str, attachments: list[Attachment],
                loaded_id: str | None) -> RouterDecision:
