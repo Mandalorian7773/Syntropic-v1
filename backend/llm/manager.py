@@ -275,8 +275,14 @@ class ModelManager:
         # budget and let a request land on a cold one. Single-user demo box.
         args += ["--parallel", "1"]
         # Reuse cached KV across a prefix that shifted rather than reprocessing
-        # it -- exactly the compaction / observation-append case.
-        args += ["--cache-reuse", "256"]
+        # it -- exactly the compaction / observation-append case. Env-switchable
+        # because a red-team run produced "}870" for an answer whose tool
+        # output was plainly "2870": the FIRST generated character was wrong,
+        # which is the signature of KV shifting corrupting the resumed context.
+        # LLAMA_CACHE_REUSE=0 disables it; the A/B lives in bench/results.
+        cache_reuse = os.getenv("LLAMA_CACHE_REUSE", "256").strip()
+        if cache_reuse and cache_reuse != "0":
+            args += ["--cache-reuse", cache_reuse]
         if spec.mmproj:
             args += ["--mmproj", str(self._model_path(spec.mmproj))]
         env = os.environ.copy()

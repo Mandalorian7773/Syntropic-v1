@@ -20,19 +20,39 @@ from .model import Block, PageResult
 
 TEXT_SUFFIXES = {".docx", ".txt", ".md", ".csv", ".xlsx"}
 PAGE_CHARS = 8000
+# A table block is atomic downstream (chunk.py never splits one), so a big
+# sheet must be cut HERE, by rows, with the header repeated on every piece --
+# otherwise the EIA refinery-capacity workbook (3,337 rows) became one block
+# larger than the whole tool budget and unsearchable in practice. 40 rows of a
+# wide sheet is a few hundred tokens: small enough to retrieve as one hit,
+# big enough that a question about one refinery lands inside a single piece.
+TABLE_ROWS_PER_BLOCK = 40
 
 
 def _table_markdown(rows: list[list[str]]) -> str:
+    """One markdown table. For a long one prefer table_markdown_blocks()."""
+    return "\n\n".join(table_markdown_blocks(rows, rows_per_block=None))
+
+
+def table_markdown_blocks(rows: list[list[str]], rows_per_block: int | None = TABLE_ROWS_PER_BLOCK) -> list[str]:
     rows = [[(c or "").strip().replace("|", "\\|").replace("\n", " ") for c in r] for r in rows]
     rows = [r for r in rows if any(r)]
     if not rows:
-        return ""
+        return []
     width = max(len(r) for r in rows)
     rows = [r + [""] * (width - len(r)) for r in rows]
     head, body = rows[0], rows[1:]
-    out = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
-    out += ["| " + " | ".join(r) + " |" for r in body]
-    return "\n".join(out)
+    header = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
+    if not body:
+        return ["\n".join(header)]
+    step = rows_per_block or len(body)
+    blocks = []
+    for start in range(0, len(body), step):
+        piece = body[start:start + step]
+        label = f"(rows {start + 1}-{start + len(piece)} of {len(body)})" if step < len(body) else ""
+        lines = ([label] if label else []) + header + ["| " + " | ".join(r) + " |" for r in piece]
+        blocks.append("\n".join(lines))
+    return blocks
 
 
 def _blocks_docx(path: Path) -> list[Block]:
@@ -87,8 +107,8 @@ def _blocks_plain(path: Path, markdown: bool) -> list[Block]:
 def _blocks_csv(path: Path) -> list[Block]:
     raw = path.read_text(encoding="utf-8", errors="replace")
     rows = list(csv.reader(io.StringIO(raw)))
-    md = _table_markdown(rows)
-    return [Block(kind="table", text=md, page=0, section=path.stem)] if md else []
+    return [Block(kind="table", text=md, page=0, section=path.stem)
+            for md in table_markdown_blocks(rows)]
 
 
 def _blocks_xlsx(path: Path) -> list[Block]:
@@ -98,10 +118,10 @@ def _blocks_xlsx(path: Path) -> list[Block]:
     blocks: list[Block] = []
     for ws in wb.worksheets:
         rows = [["" if v is None else str(v) for v in row] for row in ws.iter_rows(values_only=True)]
-        md = _table_markdown(rows)
-        if md:
+        pieces = table_markdown_blocks(rows)
+        if pieces:
             blocks.append(Block(kind="heading", text=ws.title, page=0, section=ws.title))
-            blocks.append(Block(kind="table", text=md, page=0, section=ws.title))
+            blocks += [Block(kind="table", text=md, page=0, section=ws.title) for md in pieces]
     return blocks
 
 

@@ -164,3 +164,47 @@ def test_an_image_file_is_accepted_as_a_one_page_document(tmp_path: Path):
 
     result = ingest_document(path)
     assert result.page_count == 1
+
+
+# --- text-native formats (ingest/textdoc.py) ----------------------------------
+
+def test_textdoc_big_sheet_is_split_by_rows_with_header_repeated(tmp_path):
+    """A 3,000-row workbook must not become one atomic table block.
+
+    Table blocks are never split downstream, so an unsplit sheet is a single
+    block larger than the whole tool budget: unretrievable as one hit and
+    truncated to nothing as a read. Each piece carries the header so a hit
+    is self-describing.
+    """
+    import openpyxl
+    from ingest.textdoc import TABLE_ROWS_PER_BLOCK, pages_from_text_document
+
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "refcap"
+    ws.append(["SITE", "STATE", "CAPACITY_BPD"])
+    for i in range(3000):
+        ws.append([f"SITE-{i}", "Texas", 1000 + i])
+    path = tmp_path / "big.xlsx"; wb.save(path)
+
+    pages = pages_from_text_document(path)
+    tables = [b for p in pages for b in p.blocks if b.kind == "table"]
+    assert len(tables) == -(-3000 // TABLE_ROWS_PER_BLOCK)
+    assert all("| SITE | STATE | CAPACITY_BPD |" in b.text for b in tables)
+    assert "SITE-2999" in tables[-1].text
+    assert "(rows 1-40 of 3000)" in tables[0].text
+    assert len(pages) > 1
+
+
+def test_textdoc_docx_headings_paragraphs_tables(tmp_path):
+    import docx
+    from ingest.textdoc import pages_from_text_document
+
+    d = docx.Document(); d.add_heading("Valve register", 1); d.add_paragraph("Debutaniser section.")
+    t = d.add_table(rows=2, cols=2)
+    t.cell(0, 0).text = "Tag"; t.cell(0, 1).text = "Set pressure"
+    t.cell(1, 0).text = "PSV-2103"; t.cell(1, 1).text = "12.5 barg"
+    path = tmp_path / "reg.docx"; d.save(path)
+
+    pages = pages_from_text_document(path)
+    assert [b.kind for b in pages[0].blocks] == ["heading", "paragraph", "table"]
+    assert "| PSV-2103 | 12.5 barg |" in pages[0].blocks[2].text
+    assert pages[0].blocks[2].section == "Valve register"
