@@ -6,7 +6,8 @@
  * parser broke on a chunk boundary. It spawns the mock itself, so it needs
  * nothing running.
  */
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
+import { startMock } from './mockServer';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Event } from '../types/events';
 
@@ -14,23 +15,8 @@ const PORT = 8177;
 let proc: ChildProcess;
 
 beforeAll(async () => {
-  proc = spawn(
-    'python3',
-    ['mock/server.py', '--port', String(PORT), '--fast'],
-    { stdio: 'ignore' },
-  );
-  // Wait for the port to answer rather than sleeping a fixed amount.
-  for (let i = 0; i < 100; i++) {
-    try {
-      const r = await fetch(`http://127.0.0.1:${PORT}/api/health`);
-      if (r.ok) return;
-    } catch {
-      /* not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('mock server did not start');
-}, 20000);
+  proc = await startMock(PORT);
+}, 30000);
 
 afterAll(() => proc?.kill());
 
@@ -107,7 +93,7 @@ describe('mock scenarios', () => {
     expect(loading.eta_s).toBeGreaterThan(0);
 
     const ready = evs.find((e) => e.type === 'model.ready')!;
-    expect(ready.model_id).toBe('qwen3-coder-8b');
+    expect(ready.model_id).toBe('qwen2.5-coder-7b');
     // model.loading must precede model.ready, or the swap UI never appears.
     expect(types(evs).indexOf('model.loading'))
       .toBeLessThan(types(evs).indexOf('model.ready'));

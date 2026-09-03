@@ -28,6 +28,13 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
     message: str
     attachments: list[Attachment] = Field(default_factory=list)
+    model_id: str | None = Field(
+        default=None,
+        description=(
+            "Run this turn on a specific model, overriding the router. None "
+            "means route as before, so an existing client is unaffected."
+        ),
+    )
 
 
 # --- POST /api/chat/cancel ----------------------------------------------------
@@ -53,6 +60,16 @@ class ModelInfo(BaseModel):
     context: int
     vram_mb: int
     loaded: bool
+    # A picker needs something a human can read. `id` is a filename-shaped
+    # slug; nobody choosing a model wants to compare "qwen2.5-vl-7b" against
+    # "qwen2.5-coder-7b" on a stage. Both default to "" so a producer that has
+    # not been updated still validates.
+    display_name: str = Field(
+        default="", description="Human-readable name for the picker."
+    )
+    description: str = Field(
+        default="", description="One line on what this model is good for."
+    )
 
 
 # --- GET /api/sessions and /api/sessions/{id} ---------------------------------
@@ -90,6 +107,13 @@ class SessionDetail(BaseModel):
     id: str
     messages: list[Message] = Field(default_factory=list)
     steps: list[SessionStep] = Field(default_factory=list)
+    model_id: str | None = Field(
+        default=None,
+        description=(
+            "The model this session is pinned to, set when a user picked one. "
+            "None means the router chooses per turn, which is the default."
+        ),
+    )
 
 
 # --- Documents ----------------------------------------------------------------
