@@ -40,8 +40,115 @@ class Response(BaseModel):
     tool_calls: list[ParsedToolCall] = Field(default_factory=list)
     is_final: bool
     malformed: bool = False        # grammar asked for JSON, model broke it anyway
+    # True when the answer already reached the UI token-by-token as it was
+    # generated. The loop must then NOT re-chunk `text` into token events, or
+    # the user sees the whole answer twice.
+    streamed: bool = False
     tokens_in: int = 0
     tokens_out: int = 0
+
+
+class FinalAnswerStreamer:
+    r"""Streams the answer out of `{"final": "..."}` while it is still arriving.
+
+    The tool protocol wraps every answer in JSON, so the raw deltas cannot go
+    to the UI -- they are protocol syntax. The loop's previous answer was to
+    buffer the whole response, parse it, then chop the text into token events.
+    Measured cost of that: time-to-first-token equal to total latency, 20 s of
+    blank screen on a 20 s request, and a `gen_ms` of 7 ms because every token
+    event was emitted after generation had already finished.
+
+    So decode incrementally instead. Wait for the opening `{"final": "`, then
+    emit each character of the JSON string as it decodes, honouring escapes,
+    and stop at the closing quote. Anything that is not that shape -- a tool
+    call, or `{"tool":"final","args":{...}}` -- streams nothing and is handled
+    by the existing buffered path, which stays correct.
+    """
+
+    # Matched a character at a time, skipping the whitespace JSON allows
+    # between tokens. A regex cannot do this: the deltas arrive split at
+    # arbitrary boundaries ('{"fi' then 'nal"'), and re has no partial-match
+    # mode, so any "does it match yet" test either fires early or gives up on
+    # a prefix that was still going to arrive.
+    _OPENING = '{"final":"'
+    _ESCAPES = {'"': '"', "\\": "\\", "/": "/", "b": "\b",
+                "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+
+    def __init__(self) -> None:
+        self.started = False      # we are inside the final string
+        self.done = False         # closing quote seen
+        self.emitted = ""
+        self._buf = ""            # raw not yet consumed
+        self._pending_escape = False
+        self._unicode: str | None = None
+
+    def _scan_opening(self) -> int | None:
+        """Chars consumed once `{"final":"` is complete, else None.
+
+        Sets self.done when the buffer can no longer become that opening --
+        a tool call, or the {"tool":"final",...} shape -- so the rest of the
+        response streams nothing.
+        """
+        want = 0
+        for i, ch in enumerate(self._buf):
+            if ch.isspace():
+                continue            # JSON whitespace between tokens
+            if ch != self._OPENING[want]:
+                self.done = True    # definitively some other shape
+                return None
+            want += 1
+            if want == len(self._OPENING):
+                return i + 1
+        return None                 # ran out of buffer, still undecided
+
+    def feed(self, piece: str) -> str:
+        """Add raw model output; return newly decoded answer text."""
+        if self.done:
+            return ""
+        self._buf += piece
+        if not self.started:
+            consumed = self._scan_opening()
+            if consumed is None:
+                return ""           # not this shape, or still undecided
+            self.started = True
+            self._buf = self._buf[consumed:]
+
+        out = []
+        i = 0
+        while i < len(self._buf):
+            ch = self._buf[i]
+            if self._unicode is not None:
+                self._unicode += ch
+                if len(self._unicode) == 4:
+                    try:
+                        out.append(chr(int(self._unicode, 16)))
+                    except ValueError:
+                        pass
+                    self._unicode = None
+                i += 1
+                continue
+            if self._pending_escape:
+                self._pending_escape = False
+                if ch == "u":
+                    self._unicode = ""
+                else:
+                    out.append(self._ESCAPES.get(ch, ch))
+                i += 1
+                continue
+            if ch == "\\":
+                self._pending_escape = True
+                i += 1
+                continue
+            if ch == '"':
+                self.done = True
+                i += 1
+                break
+            out.append(ch)
+            i += 1
+        self._buf = self._buf[i:]
+        text = "".join(out)
+        self.emitted += text
+        return text
 
 
 def _final_text(args: Any) -> str:
@@ -69,6 +176,25 @@ class LLMClient:
     def __init__(self, manager: ModelManager, timeout_s: float = 300.0) -> None:
         self._manager = manager
         self._timeout = timeout_s
+        # One client, reused. A fresh AsyncClient per generate() means a new
+        # connection per agent step, and the agent makes one call per step for
+        # up to MAX_STEPS steps on every message.
+        self._client: httpx.AsyncClient | None = None
+
+    def _http(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=self._timeout,
+                limits=httpx.Limits(max_keepalive_connections=4,
+                                    max_connections=8),
+            )
+        return self._client
+
+    async def aclose(self) -> None:
+        """Called from the FastAPI shutdown hook."""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+        self._client = None
 
     async def generate(
         self,
@@ -93,6 +219,11 @@ class LLMClient:
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": stream,
+            # Explicit, not left to the server default: every agent step
+            # re-sends the whole conversation, so reusing the cached prefix is
+            # the difference between reprocessing ~3000 tokens per step and
+            # processing only what was appended.
+            "cache_prompt": True,
         }
         if grammar:
             # Grammar-constrained decoding: the tool protocol is enforced at
@@ -110,46 +241,60 @@ class LLMClient:
         # decoder unconstrained, so bench can put a number on what the grammar
         # is worth. json_mode output never streams to the UI as tokens.
         json_mode = expect_json or grammar is not None
+        streamer = FinalAnswerStreamer() if (json_mode and on_token and stream) else None
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            if stream:
-                async with client.stream("POST", url, json=payload) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if not line.startswith("data: "):
-                            continue
-                        data = line[len("data: "):]
-                        if data.strip() == "[DONE]":
-                            break
-                        chunk = json.loads(data)
-                        usage = chunk.get("usage")
-                        if usage:
-                            tokens_in = usage.get("prompt_tokens", 0)
-                            tokens_out = usage.get("completion_tokens", 0)
-                        for choice in chunk.get("choices", []):
-                            piece = (choice.get("delta") or {}).get("content") or ""
-                            if piece:
-                                raw += piece
-                                # Only free-text streams to the UI; protocol
-                                # JSON is parsed, never shown raw.
-                                if on_token and not json_mode:
-                                    await on_token(piece)
-            else:
-                resp = await client.post(url, json=payload)
+        client = self._http()
+        if stream:
+            async with client.stream("POST", url, json=payload) as resp:
                 resp.raise_for_status()
-                body = resp.json()
-                raw = body["choices"][0]["message"].get("content") or ""
-                usage = body.get("usage") or {}
-                tokens_in = usage.get("prompt_tokens", 0)
-                tokens_out = usage.get("completion_tokens", 0)
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[len("data: "):]
+                    if data.strip() == "[DONE]":
+                        break
+                    chunk = json.loads(data)
+                    usage = chunk.get("usage")
+                    if usage:
+                        tokens_in = usage.get("prompt_tokens", 0)
+                        tokens_out = usage.get("completion_tokens", 0)
+                    for choice in chunk.get("choices", []):
+                        piece = (choice.get("delta") or {}).get("content") or ""
+                        if piece:
+                            raw += piece
+                            if not on_token:
+                                continue
+                            if not json_mode:
+                                await on_token(piece)
+                            elif streamer is not None:
+                                # Protocol JSON never goes to the UI raw --
+                                # but the answer INSIDE it can, as it lands.
+                                text = streamer.feed(piece)
+                                if text:
+                                    await on_token(text)
+        else:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+            raw = body["choices"][0]["message"].get("content") or ""
+            usage = body.get("usage") or {}
+            tokens_in = usage.get("prompt_tokens", 0)
+            tokens_out = usage.get("completion_tokens", 0)
 
         if not tokens_in:
             tokens_in = sum(len(str(m.get("content", ""))) for m in messages) // 4
         if not tokens_out:
             tokens_out = len(raw) // 4
 
-        return self._parse(raw, json_mode=json_mode,
-                           tokens_in=tokens_in, tokens_out=tokens_out)
+        parsed = self._parse(raw, json_mode=json_mode,
+                             tokens_in=tokens_in, tokens_out=tokens_out)
+        if streamer is not None and streamer.emitted and parsed.is_final:
+            # Only trust the incremental decode when it agrees with the
+            # authoritative parse. If they differ the model produced something
+            # the streamer misread, and re-chunking the parsed text is the safe
+            # outcome -- a duplicated answer is better than a truncated one.
+            parsed.streamed = streamer.emitted == parsed.text
+        return parsed
 
     @staticmethod
     def _parse(raw: str, json_mode: bool, tokens_in: int, tokens_out: int) -> Response:

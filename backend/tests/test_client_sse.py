@@ -58,3 +58,45 @@ async def test_cancels_registry():
     assert not c.cancel("ghost")
     # Re-registering after a set event hands back a fresh one.
     assert not c.register("s1").is_set()
+
+
+# --- incremental streaming of the grammar-wrapped answer -----------------------
+
+def _feed_all(pieces):
+    from llm.client import FinalAnswerStreamer
+    s = FinalAnswerStreamer()
+    out = "".join(s.feed(p) for p in pieces)
+    return s, out
+
+
+def test_streamer_emits_answer_as_it_arrives():
+    """The point of the class: text out before generation has finished."""
+    s, out = _feed_all(['{"final": "The set ', 'pressure is 12.5 ', 'barg."}'])
+    assert out == "The set pressure is 12.5 barg."
+    assert s.done and s.emitted == out
+
+
+def test_streamer_handles_split_prefix_and_escapes():
+    # The opening token boundary can land anywhere, including mid-key.
+    s, out = _feed_all(['{"fi', 'nal"', ' : ', '"line1\nline2 ', '\\"quoted\\" \u00b0C"}'])
+    assert out == 'line1\nline2 "quoted" °C'
+    assert s.done
+
+
+def test_streamer_stays_silent_on_a_tool_call():
+    """A tool call must stream nothing -- it is protocol, not an answer."""
+    s, out = _feed_all(['{"tool": "search_documents", "args": {"query": "x"}}'])
+    assert out == ""
+    assert s.emitted == ""
+
+
+def test_streamer_stays_silent_on_tool_final_shape():
+    """{"tool":"final",...} is handled by the buffered path, not streamed."""
+    s, out = _feed_all(['{"tool": "final", "args": {"answer": "12.5 barg"}}'])
+    assert out == ""
+
+
+def test_streamer_stops_at_closing_quote():
+    """Trailing protocol bytes after the string must not reach the user."""
+    s, out = _feed_all(['{"final": "done"}', 'trailing junk'])
+    assert out == "done"

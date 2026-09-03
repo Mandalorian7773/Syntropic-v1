@@ -7,6 +7,7 @@ import json
 import pytest
 
 from agent.loop import MAX_STEPS, MAX_TOOL_RETRIES, AgentLoop
+from contracts import ToolResult
 from llm.client import ParsedToolCall, Response
 
 
@@ -205,3 +206,44 @@ async def test_tool_calls_persisted_with_results(ws, registry, store, audit):
     rows = store._read("SELECT * FROM tool_calls WHERE session_id='s1'")
     assert len(rows) == 1
     assert rows[0]["name"] == "write_file" and rows[0]["ok"] == 1
+
+
+async def test_unavailable_tool_is_dropped_not_retried(ws, registry, store, audit):
+    """A dead backing service must cost one call, not MAX_TOOL_RETRIES.
+
+    In one bench run a stopped Docker engine produced 11 of 16 failures --
+    every task that wanted to run code burned three identical retries and died
+    as TOOL_RETRIES_EXCEEDED, which reads as a broken agent rather than a
+    stopped daemon. The tool is now dropped from the grammar for the rest of
+    the run and the model is told once.
+    """
+    store.ensure_session("s1")
+
+    class DeadTool:
+        name = "execute_python"
+        description = "Run Python in an offline sandbox."
+        args_model = registry._tools["list_files"].args_model
+        calls = 0
+
+        def run(self, args, ctx):
+            DeadTool.calls += 1
+            return ToolResult(ok=False, content="", duration_ms=1,
+                              error="sandbox unavailable: the Docker engine is not reachable")
+
+    registry.register(DeadTool())
+    llm = FakeLLM([
+        tool_call("execute_python", {"path": "."}),
+        final("I could not run code, so here is the reasoning instead."),
+    ])
+    events = await collect(make_loop(llm, registry, store, audit, ws))
+    assert DeadTool.calls == 1, "the dead tool must be called once, not retried"
+    assert [e for e in events if e.type == "error"] == []
+    assert events[-1].stop_reason == "final_answer"
+    # Asserted on the audit trail, not on llm.requests: FakeLLM stores a
+    # reference to the loop's live message list, so every recorded request
+    # aliases the same object and cannot show what was sent when.
+    kinds = [r["kind"] for r in audit.trail("s1")]
+    assert "tool.unavailable" in kinds
+    # The second request went out with the tool removed from the grammar, so
+    # the model cannot utter it again even if it wants to.
+    assert "execute_python" not in (llm.requests[-1]["grammar"] or "")

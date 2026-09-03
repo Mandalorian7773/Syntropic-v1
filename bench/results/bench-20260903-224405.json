@@ -1,0 +1,892 @@
+{
+  "ts": 1788455645,
+  "endpoint": "http://localhost:8000",
+  "tasks_run": 26,
+  "success_rate": 0.192,
+  "route_accuracy": 0.885,
+  "malformed_total": 0,
+  "avg_latency_ms": 18733,
+  "results": [
+    {
+      "id": "gen-01",
+      "task_type": "general",
+      "prompt": "What is the purpose of a flare stack in a refinery? Answer in two sentences.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "general",
+      "route_confidence": 0.6714,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 3,
+      "tokens_in": 3020,
+      "tokens_out": 106,
+      "latency_ms": 7833,
+      "ttft_ms": 7837,
+      "final_chars": 273,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 591
+        },
+        "router_ms": 8,
+        "first_token_ms": 7837,
+        "gen_ms": 5,
+        "tool_ms_total": 591,
+        "think_ms": 7238,
+        "total_ms": 7842,
+        "unaccounted_ms": 8
+      },
+      "success": true,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "gen-02",
+      "task_type": "general",
+      "prompt": "Explain in one paragraph why nitrogen purging is done before opening a process vessel.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "general",
+      "route_confidence": 0.5992208206327502,
+      "route_correct": true,
+      "errors": [
+        "LOOP_DETECTED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 3669,
+      "tokens_out": 93,
+      "latency_ms": 8129,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 572
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 572,
+        "think_ms": 1919,
+        "total_ms": 8138,
+        "unaccounted_ms": 5647
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "gen-03",
+      "task_type": "general",
+      "prompt": "List three hazards of hydrogen sulfide exposure.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.28518493944113427,
+      "route_correct": false,
+      "errors": [
+        "LOOP_DETECTED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 3648,
+      "tokens_out": 84,
+      "latency_ms": 8137,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 651
+        },
+        "router_ms": 8,
+        "gen_ms": 0,
+        "tool_ms_total": 651,
+        "think_ms": 1867,
+        "total_ms": 8147,
+        "unaccounted_ms": 5629
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "gen-04",
+      "task_type": "general",
+      "prompt": "What is the difference between preventive and predictive maintenance? Two sentences.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "general",
+      "route_confidence": 0.7499,
+      "route_correct": true,
+      "errors": [
+        "LOOP_DETECTED"
+      ],
+      "stop_reason": "error",
+      "steps": 4,
+      "tokens_in": 3221,
+      "tokens_out": 109,
+      "latency_ms": 8411,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 1080
+        },
+        "router_ms": 9,
+        "gen_ms": 0,
+        "tool_ms_total": 1080,
+        "think_ms": 3564,
+        "total_ms": 8422,
+        "unaccounted_ms": 3778
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "code-01",
+      "task_type": "code",
+      "prompt": "Write a Python function celsius_to_fahrenheit(c) and demonstrate it on 100 C by executing it. Report the output.",
+      "routed_model": "qwen2.5-coder-7b",
+      "routed_task": "code",
+      "route_confidence": 0.6269,
+      "route_correct": true,
+      "swap_load_ms": 10635,
+      "stop_reason": "final_answer",
+      "steps": 2,
+      "tokens_in": 1243,
+      "tokens_out": 71,
+      "latency_ms": 15384,
+      "ttft_ms": 15394,
+      "final_chars": 61,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 439
+        },
+        "router_ms": 10,
+        "swap_started_ms": 13364,
+        "model_ready_ms": 13364,
+        "first_token_ms": 15394,
+        "gen_ms": 3,
+        "tool_ms_total": 439,
+        "think_ms": 1591,
+        "total_ms": 15397,
+        "unaccounted_ms": 2729
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 1236
+    },
+    {
+      "id": "code-02",
+      "task_type": "code",
+      "prompt": "Write and run Python that computes the sum of squares of integers 1 to 20. Report the number.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "code",
+      "route_confidence": 0.4738373873405457,
+      "route_correct": true,
+      "swap_load_ms": 16965,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2019,
+      "tokens_out": 102,
+      "latency_ms": 23706,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 37
+        },
+        "router_ms": 6,
+        "swap_started_ms": 19759,
+        "model_ready_ms": 19759,
+        "gen_ms": 0,
+        "tool_ms_total": 37,
+        "think_ms": 3916,
+        "total_ms": 23714,
+        "unaccounted_ms": 2796
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 236
+    },
+    {
+      "id": "code-03",
+      "task_type": "code",
+      "prompt": "Write a file called readings.csv in the workspace with columns tag,value and three rows of sample data, then read it back and confirm its contents.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "code",
+      "route_confidence": 0.3362907441372585,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 3,
+      "tokens_in": 1900,
+      "tokens_out": 100,
+      "latency_ms": 6112,
+      "ttft_ms": 6119,
+      "final_chars": 68,
+      "phases": {
+        "tool_ms_by_name": {
+          "write_file": 4,
+          "read_file": 3
+        },
+        "router_ms": 7,
+        "first_token_ms": 6119,
+        "gen_ms": 2,
+        "tool_ms_total": 7,
+        "think_ms": 6105,
+        "total_ms": 6121,
+        "unaccounted_ms": 7
+      },
+      "success": true,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "code-04",
+      "task_type": "code",
+      "prompt": "Write and execute Python that finds all prime numbers below 50 and prints them comma separated.",
+      "routed_model": "qwen2.5-coder-7b",
+      "routed_task": "code",
+      "route_confidence": 0.671,
+      "route_correct": true,
+      "swap_load_ms": 10896,
+      "stop_reason": "final_answer",
+      "steps": 2,
+      "tokens_in": 1285,
+      "tokens_out": 129,
+      "latency_ms": 16468,
+      "ttft_ms": 16476,
+      "final_chars": 50,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 12
+        },
+        "router_ms": 9,
+        "swap_started_ms": 14984,
+        "model_ready_ms": 14984,
+        "first_token_ms": 16476,
+        "gen_ms": 3,
+        "tool_ms_total": 12,
+        "think_ms": 1480,
+        "total_ms": 16479,
+        "unaccounted_ms": 4088
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 1236
+    },
+    {
+      "id": "code-05",
+      "task_type": "code",
+      "prompt": "Write a Python regex that extracts equipment tags of the form P-101A from the text 'inspect P-101A and E-204B today', run it, and report the matches.",
+      "routed_model": "qwen2.5-coder-7b",
+      "routed_task": "code",
+      "route_confidence": 0.6166,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 2,
+      "tokens_in": 1299,
+      "tokens_out": 93,
+      "latency_ms": 4772,
+      "ttft_ms": 4780,
+      "final_chars": 53,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 8
+        },
+        "router_ms": 8,
+        "first_token_ms": 4780,
+        "gen_ms": 2,
+        "tool_ms_total": 8,
+        "think_ms": 4764,
+        "total_ms": 4782,
+        "unaccounted_ms": 8
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 1234
+    },
+    {
+      "id": "code-06",
+      "task_type": "code",
+      "prompt": "Using pandas in the sandbox, create a DataFrame of 5 pump vibration readings, compute the mean, and report it.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.3231240829891134,
+      "route_correct": false,
+      "swap_load_ms": 16857,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2307,
+      "tokens_out": 387,
+      "latency_ms": 31292,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 51
+        },
+        "router_ms": 9,
+        "swap_started_ms": 22149,
+        "model_ready_ms": 22149,
+        "gen_ms": 0,
+        "tool_ms_total": 51,
+        "think_ms": 9100,
+        "total_ms": 31303,
+        "unaccounted_ms": 5295
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 236
+    },
+    {
+      "id": "code-07",
+      "task_type": "code",
+      "prompt": "Write Python that deliberately divides by zero inside a try block, catches the exception, prints 'recovered', and run it.",
+      "routed_model": "qwen2.5-coder-7b",
+      "routed_task": "code",
+      "route_confidence": 0.7049,
+      "route_correct": true,
+      "swap_load_ms": 10835,
+      "stop_reason": "final_answer",
+      "steps": 2,
+      "tokens_in": 1223,
+      "tokens_out": 69,
+      "latency_ms": 15096,
+      "ttft_ms": 15100,
+      "final_chars": 133,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 8
+        },
+        "router_ms": 7,
+        "swap_started_ms": 13134,
+        "model_ready_ms": 13134,
+        "first_token_ms": 15100,
+        "gen_ms": 5,
+        "tool_ms_total": 8,
+        "think_ms": 1958,
+        "total_ms": 15105,
+        "unaccounted_ms": 2299
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 1246
+    },
+    {
+      "id": "code-08",
+      "task_type": "code",
+      "prompt": "Write and run Python that converts 150 psi to kPa (1 psi = 6.89476 kPa) and reports the value rounded to one decimal.",
+      "routed_model": "qwen2.5-coder-7b",
+      "routed_task": "code",
+      "route_confidence": 0.619,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 5,
+      "tokens_in": 4074,
+      "tokens_out": 202,
+      "latency_ms": 11085,
+      "ttft_ms": 11095,
+      "final_chars": 6,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 21,
+          "write_file": 4,
+          "read_file": 2
+        },
+        "router_ms": 9,
+        "first_token_ms": 11095,
+        "gen_ms": 1,
+        "tool_ms_total": 27,
+        "think_ms": 11059,
+        "total_ms": 11096,
+        "unaccounted_ms": 9
+      },
+      "success": true,
+      "malformed": 0,
+      "vram_free_mb": 1234
+    },
+    {
+      "id": "data-01",
+      "task_type": "data",
+      "prompt": "Thickness readings in mm by year: 2019: 9.8, 2020: 9.5, 2021: 9.1, 2022: 8.8, 2023: 8.4. Calculate the average annual corrosion rate in mm/yr.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.6297,
+      "route_correct": true,
+      "swap_load_ms": 16870,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2331,
+      "tokens_out": 264,
+      "latency_ms": 27886,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 28
+        },
+        "router_ms": 7,
+        "swap_started_ms": 20962,
+        "model_ready_ms": 20962,
+        "gen_ms": 0,
+        "tool_ms_total": 28,
+        "think_ms": 6903,
+        "total_ms": 27895,
+        "unaccounted_ms": 4094
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 236
+    },
+    {
+      "id": "data-02",
+      "task_type": "data",
+      "prompt": "Monthly downtime hours: Jan 12, Feb 8, Mar 21, Apr 5. What is the total and which month is worst?",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.3711893950155231,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2217,
+      "tokens_out": 273,
+      "latency_ms": 10786,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 42
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 42,
+        "think_ms": 10743,
+        "total_ms": 10795,
+        "unaccounted_ms": 10
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 236
+    },
+    {
+      "id": "data-03",
+      "task_type": "data",
+      "prompt": "A tank holds 5000 m3 and is 62 percent full. Daily draw is 155 m3. How many full days of stock remain? Show the calculation.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.32277951541304456,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2166,
+      "tokens_out": 198,
+      "latency_ms": 8687,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 37
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 37,
+        "think_ms": 8648,
+        "total_ms": 8695,
+        "unaccounted_ms": 10
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "data-04",
+      "task_type": "data",
+      "prompt": "Readings: 101, 99, 104, 250, 98, 102. Identify the outlier and give the mean without it.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.3635085871668009,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2388,
+      "tokens_out": 417,
+      "latency_ms": 14353,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 33
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 33,
+        "think_ms": 14319,
+        "total_ms": 14361,
+        "unaccounted_ms": 9
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "data-05",
+      "task_type": "data",
+      "prompt": "Planned manhours 1200, actual 1470. What is the overrun percentage, to one decimal?",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "general",
+      "route_confidence": 0.346374679206723,
+      "route_correct": false,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2091,
+      "tokens_out": 162,
+      "latency_ms": 7484,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 49
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 49,
+        "think_ms": 7433,
+        "total_ms": 7492,
+        "unaccounted_ms": 10
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "data-06",
+      "task_type": "data",
+      "prompt": "Pump A ran 8200 h with 4 failures, pump B 7600 h with 2 failures. Compute MTBF for each and say which is more reliable.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.2500776669218641,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2259,
+      "tokens_out": 291,
+      "latency_ms": 10946,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 29
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 29,
+        "think_ms": 10917,
+        "total_ms": 10954,
+        "unaccounted_ms": 8
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "data-07",
+      "task_type": "data",
+      "prompt": "Lab sulfur results in ppm: 8, 11, 9, 14, 10, 12. Spec limit is 10 ppm. How many samples exceed spec and what is the median?",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "data",
+      "route_confidence": 0.4328946882455909,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2283,
+      "tokens_out": 294,
+      "latency_ms": 11388,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "execute_python": 29
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 29,
+        "think_ms": 11358,
+        "total_ms": 11396,
+        "unaccounted_ms": 9
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-01",
+      "task_type": "document",
+      "prompt": "Search the indexed documents for the pump startup procedure and summarize its precondition checks with citations.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.6041,
+      "route_correct": true,
+      "errors": [
+        "LOOP_DETECTED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 3603,
+      "tokens_out": 81,
+      "latency_ms": 9313,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 1781
+        },
+        "router_ms": 6,
+        "gen_ms": 0,
+        "tool_ms_total": 1781,
+        "think_ms": 1832,
+        "total_ms": 9321,
+        "unaccounted_ms": 5708
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-02",
+      "task_type": "document",
+      "prompt": "What do the indexed documents say about minimum wall thickness? Cite the source page.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.5853749353679243,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 6,
+      "tokens_in": 16933,
+      "tokens_out": 593,
+      "latency_ms": 35083,
+      "ttft_ms": 35068,
+      "final_chars": 1361,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 735,
+          "read_document": 2095
+        },
+        "router_ms": 7,
+        "first_token_ms": 35068,
+        "gen_ms": 23,
+        "tool_ms_total": 2830,
+        "think_ms": 32231,
+        "total_ms": 35091,
+        "unaccounted_ms": 7
+      },
+      "success": true,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-03",
+      "task_type": "document",
+      "prompt": "Find the confined space entry requirements in the document index and list them as bullets.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.6395,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 5,
+      "tokens_in": 11642,
+      "tokens_out": 895,
+      "latency_ms": 38292,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 683,
+          "read_document": 580,
+          "create_docx": 1581
+        },
+        "router_ms": 8,
+        "gen_ms": 0,
+        "tool_ms_total": 2844,
+        "think_ms": 35448,
+        "total_ms": 38302,
+        "unaccounted_ms": 10
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-04",
+      "task_type": "document",
+      "prompt": "Summarize the most recent incident report in the index into five bullet points with a citation.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.5945744534840176,
+      "route_correct": true,
+      "errors": [
+        "TOOL_RETRIES_EXCEEDED"
+      ],
+      "stop_reason": "error",
+      "steps": 5,
+      "tokens_in": 15961,
+      "tokens_out": 3053,
+      "latency_ms": 103342,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 656,
+          "read_document": 472,
+          "create_docx": 1447
+        },
+        "router_ms": 10,
+        "gen_ms": 0,
+        "tool_ms_total": 2575,
+        "think_ms": 100766,
+        "total_ms": 103354,
+        "unaccounted_ms": 13
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-05",
+      "task_type": "document",
+      "prompt": "Which document mentions hot work permits, and what does it require? Quote the relevant line.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.3811892882845721,
+      "route_correct": true,
+      "stop_reason": "final_answer",
+      "steps": 3,
+      "tokens_in": 3123,
+      "tokens_out": 124,
+      "latency_ms": 9716,
+      "ttft_ms": 9719,
+      "final_chars": 206,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 631,
+          "read_document": 520
+        },
+        "router_ms": 7,
+        "first_token_ms": 9719,
+        "gen_ms": 5,
+        "tool_ms_total": 1151,
+        "think_ms": 8561,
+        "total_ms": 9724,
+        "unaccounted_ms": 7
+      },
+      "success": true,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-06",
+      "task_type": "document",
+      "prompt": "Create a one-paragraph brief of the safety procedure most relevant to welding, citing the document and page.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.595147720428507,
+      "route_correct": true,
+      "errors": [
+        "LOOP_DETECTED"
+      ],
+      "stop_reason": "error",
+      "steps": 3,
+      "tokens_in": 2368,
+      "tokens_out": 84,
+      "latency_ms": 6170,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 604
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 604,
+        "think_ms": 1723,
+        "total_ms": 6179,
+        "unaccounted_ms": 3852
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "doc-07",
+      "task_type": "document",
+      "prompt": "List every inspection interval mentioned in the indexed maintenance documents, with citations.",
+      "routed_model": "qwen2.5-vl-7b",
+      "routed_task": "document",
+      "route_confidence": 0.5990633775468465,
+      "route_correct": true,
+      "stop_reason": "max_steps",
+      "steps": 10,
+      "tokens_in": 36814,
+      "tokens_out": 465,
+      "latency_ms": 37187,
+      "ttft_ms": null,
+      "final_chars": 0,
+      "phases": {
+        "tool_ms_by_name": {
+          "search_documents": 1928,
+          "read_document": 2547
+        },
+        "router_ms": 7,
+        "gen_ms": 0,
+        "tool_ms_total": 4475,
+        "think_ms": 32707,
+        "total_ms": 37195,
+        "unaccounted_ms": 13
+      },
+      "success": false,
+      "malformed": 0,
+      "vram_free_mb": 234
+    },
+    {
+      "id": "vis-01",
+      "skipped": "attachment missing: demo/documents/gauge.jpg"
+    },
+    {
+      "id": "vis-02",
+      "skipped": "attachment missing: demo/documents/nameplate.jpg"
+    },
+    {
+      "id": "vis-03",
+      "skipped": "attachment missing: demo/documents/pipe.jpg"
+    },
+    {
+      "id": "vis-04",
+      "skipped": "attachment missing: demo/documents/pid.png"
+    }
+  ]
+}
