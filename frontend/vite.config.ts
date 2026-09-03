@@ -33,5 +33,10 @@ export default defineConfig({
     // The store test drives the real SSE client, which needs an absolute base.
     env: { VITE_API_BASE: 'http://127.0.0.1:8178' },
     testTimeout: 20000,
+    // API_BASE above is read once at module load, so every suite that drives
+    // the store has to talk to the same port -- and two suites cannot both
+    // bind it at once. Running test files one at a time is the cost of that,
+    // and it is small: the mock starts in well under a second with --fast.
+    fileParallelism: false,
   },
 });

@@ -68,22 +68,103 @@ def tokens(text: str, wpm_ms: tuple[float, float] = (0.030, 0.080)) -> Iterator[
 # Fixtures
 # --------------------------------------------------------------------------
 
+# Ids, capabilities and VRAM mirror config/models.yaml. A mock that offers a
+# model the real registry does not have produces a picker that demos beautifully
+# and then fails on the day, so this is worth keeping in step.
 MODELS = [
     {
         "id": "qwen2.5-vl-7b",
+        "display_name": "Qwen2.5 VL 7B",
+        "description": "Reads images and scanned pages and answers questions "
+                       "from your documents.",
         "capabilities": ["general", "document", "vision", "data"],
         "context": 16384,
-        "vram_mb": 5600,
+        "vram_mb": 5903,
         "loaded": True,
     },
     {
-        "id": "qwen3-coder-8b",
-        "capabilities": ["general", "code"],
+        "id": "qwen2.5-coder-7b",
+        "display_name": "Qwen2.5 Coder 7B",
+        "description": "Writes and reviews code.",
+        "capabilities": ["code"],
         "context": 16384,
-        "vram_mb": 5100,
+        "vram_mb": 4895,
         "loaded": False,
     },
 ]
+
+# Which model the mock is pretending to hold. One at a time, like the 6 GB card.
+LOADED_MODEL = next(m["id"] for m in MODELS if m["loaded"])
+
+# Sessions pinned to a model by the picker, so a conversation stays on it.
+SESSION_MODEL: dict[str, str] = {}
+
+TASK_CAPABILITY = {"general": "general", "code": "code", "document": "document",
+                   "vision": "vision", "data": "data"}
+
+
+def model_by_id(model_id: str) -> dict | None:
+    return next((m for m in MODELS if m["id"] == model_id), None)
+
+
+def task_of(message: str, has_image: bool) -> str:
+    """What the mock thinks this turn needs. Mirrors the real hard rule."""
+    if has_image:
+        return "vision"
+    return {"code": "code", "document": "document", "failure": "general",
+            "simple": "general"}[pick_scenario(message)]
+
+
+def check_choice(model_id: str, message: str, has_image: bool) -> str | None:
+    """None if the pick is allowed, else the message explaining the refusal.
+
+    The real gateway refuses on the same two grounds -- unknown id, or a
+    capability the turn needs and the model does not advertise -- so the picker
+    can be built and its error state demoed with no backend running.
+    """
+    spec = model_by_id(model_id)
+    if spec is None:
+        known = ", ".join(sorted(m["id"] for m in MODELS))
+        return f"unknown model_id {model_id!r}. Available models: {known}."
+
+    capability = TASK_CAPABILITY[task_of(message, has_image)]
+    if capability not in spec["capabilities"]:
+        capable = [m["id"] for m in MODELS if capability in m["capabilities"]]
+        suggestion = (f" Try {', '.join(capable)}." if capable else
+                      f" No configured model advertises {capability!r}.")
+        return (f"{model_id!r} cannot handle this request: it needs the "
+                f"{capability!r} capability and {model_id!r} advertises "
+                f"{sorted(spec['capabilities'])}.{suggestion}")
+    return None
+
+
+def swap_events(model_id: str) -> Iterator[dict]:
+    """model.loading -> the wait -> model.ready, or nothing if already resident.
+
+    The wait is real. A swap costs 9-19 s on the demo card and the UI has to
+    stay legible across it; a mock that returns instantly lets you build a
+    progress indicator that has never once been watched.
+    """
+    global LOADED_MODEL
+    if model_id == LOADED_MODEL:
+        spec = model_by_id(model_id)
+        yield {"type": "model.ready", "model_id": model_id,
+               "load_ms": 0, "vram_mb": spec["vram_mb"]}
+        return
+
+    evicting = LOADED_MODEL
+    spec = model_by_id(model_id)
+    eta = 12
+    yield {"type": "model.loading", "model_id": model_id,
+           "evicting": evicting, "eta_s": eta}
+    started = time.time()
+    hold(eta * 0.85)
+    LOADED_MODEL = model_id
+    for entry in MODELS:
+        entry["loaded"] = entry["id"] == model_id
+    yield {"type": "model.ready", "model_id": model_id,
+           "load_ms": int((time.time() - started) * 1000),
+           "vram_mb": spec["vram_mb"]}
 
 DOCUMENTS = [
     {"doc_id": "d7", "filename": "SOP-014-Pressure-Vessel-Inspection.pdf",
@@ -144,11 +225,11 @@ def scenario_document(session_id: str) -> Iterator[dict]:
         "task_type": "document",
         "confidence": 0.91,
         "reason": "attachment is a scanned PDF; query asks for values from a table",
-        "alternatives": ["qwen3-coder-8b"],
+        "alternatives": ["qwen2.5-coder-7b"],
     }
     hold(0.6)
     yield {"type": "model.ready", "model_id": "qwen2.5-vl-7b",
-           "load_ms": 0, "vram_mb": 5600}
+           "load_ms": 0, "vram_mb": 5903}
     hold(0.3)
 
     # Step 1 -- read the document
@@ -244,7 +325,7 @@ def scenario_code(session_id: str) -> Iterator[dict]:
 
     yield {
         "type": "router.decision",
-        "model_id": "qwen3-coder-8b",
+        "model_id": "qwen2.5-coder-7b",
         "task_type": "code",
         "confidence": 0.88,
         "reason": "request asks for a script; coder model scores higher on HumanEval",
@@ -253,11 +334,11 @@ def scenario_code(session_id: str) -> Iterator[dict]:
     hold(0.5)
 
     # The swap. Nine seconds of visible dead air if the UI does not handle it.
-    yield {"type": "model.loading", "model_id": "qwen3-coder-8b",
+    yield {"type": "model.loading", "model_id": "qwen2.5-coder-7b",
            "evicting": "qwen2.5-vl-7b", "eta_s": 9}
     hold(9.4)  # deliberately slightly OVER eta_s, so the UI must handle overrun
-    yield {"type": "model.ready", "model_id": "qwen3-coder-8b",
-           "load_ms": 9420, "vram_mb": 5100}
+    yield {"type": "model.ready", "model_id": "qwen2.5-coder-7b",
+           "load_ms": 9420, "vram_mb": 4895}
     hold(0.4)
 
     yield {"type": "agent.step", "step": 1, "max_steps": 10}
@@ -322,10 +403,10 @@ def scenario_failure(session_id: str) -> Iterator[dict]:
            "task_type": "data", "confidence": 0.63,
            "reason": "tabular aggregation over an uploaded workbook; "
                      "confidence low, coder was close",
-           "alternatives": ["qwen3-coder-8b"]}
+           "alternatives": ["qwen2.5-coder-7b"]}
     hold(0.5)
     yield {"type": "model.ready", "model_id": "qwen2.5-vl-7b",
-           "load_ms": 0, "vram_mb": 5600}
+           "load_ms": 0, "vram_mb": 5903}
     hold(0.3)
 
     yield {"type": "agent.step", "step": 1, "max_steps": 10}
@@ -391,10 +472,10 @@ def scenario_simple(session_id: str) -> Iterator[dict]:
     yield {"type": "router.decision", "model_id": "qwen2.5-vl-7b",
            "task_type": "general", "confidence": 0.77,
            "reason": "no attachment, no code request; generalist is already resident",
-           "alternatives": ["qwen3-coder-8b"]}
+           "alternatives": ["qwen2.5-coder-7b"]}
     hold(0.4)
     yield {"type": "model.ready", "model_id": "qwen2.5-vl-7b",
-           "load_ms": 0, "vram_mb": 5600}
+           "load_ms": 0, "vram_mb": 5903}
     hold(0.3)
     yield {"type": "agent.step", "step": 1, "max_steps": 10}
     yield from tokens(
@@ -509,6 +590,7 @@ class Handler(BaseHTTPRequestHandler):
                      "args": {"query": "wall loss", "top_k": 5}, "ok": True,
                      "summary": "5 hits, top score 0.87", "duration_ms": 1370},
                 ],
+                "model_id": SESSION_MODEL.get(sid),
             })
 
         if path == "/api/documents":
@@ -569,6 +651,22 @@ class Handler(BaseHTTPRequestHandler):
         body = self._read_json()
         message = str(body.get("message") or "")
         session_id = str(body.get("session_id") or uuid.uuid4())
+        attachments = body.get("attachments") or []
+        has_image = any(str(a.get("mime", "")).startswith("image/")
+                        for a in attachments)
+
+        # An explicit pick wins and pins the session; otherwise an already
+        # pinned session stays where it is.
+        chosen = body.get("model_id") or SESSION_MODEL.get(session_id)
+        if chosen:
+            problem = check_choice(chosen, message, has_image)
+            if problem:
+                # Refused before the stream opens, so the SPA gets a normal
+                # JSON error rather than an SSE frame it has to special-case.
+                return self._json({"detail": problem}, status=400)
+            if body.get("model_id"):
+                SESSION_MODEL[session_id] = chosen
+
         name = pick_scenario(message)
         CANCELLED.discard(session_id)
 
@@ -591,6 +689,25 @@ class Handler(BaseHTTPRequestHandler):
                     break
                 if event["type"] == "agent.step":
                     steps = event["step"]
+
+                if chosen:
+                    # The scenario still narrates the turn, but the routing and
+                    # the swap are replaced by the user's choice.
+                    if event["type"] == "router.decision":
+                        self._frame({
+                            "type": "router.decision", "model_id": chosen,
+                            "task_type": task_of(message, has_image),
+                            "confidence": 1.0,
+                            "reason": f"user selected {chosen}",
+                            "alternatives": [m["id"] for m in MODELS
+                                             if m["id"] != chosen],
+                        })
+                        for swap in swap_events(chosen):
+                            self._frame(swap)
+                        continue
+                    if event["type"] in ("model.loading", "model.ready"):
+                        continue  # superseded by swap_events above
+
                 self._frame(event)
         except (BrokenPipeError, ConnectionResetError):
             print(f"mock: client disconnected from {session_id[:8]}")

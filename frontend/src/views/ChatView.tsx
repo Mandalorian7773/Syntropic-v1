@@ -15,6 +15,7 @@ import type { KeyboardEvent } from 'react';
 import { useSession } from '../store/session';
 import type { ChatMessage } from '../store/session';
 import Markdown from '../components/Markdown';
+import { ModelPicker, SwapProgress } from '../components/ModelPicker';
 import { Dot, ms } from '../components/ui';
 
 export default function ChatView() {
@@ -72,6 +73,9 @@ export default function ChatView() {
         </button>
       )}
 
+      {/* Above the composer, so a fifteen-second swap is the last thing you
+          saw move rather than something you have to go looking for. */}
+      <SwapProgress />
       <Composer />
     </div>
   );
@@ -362,9 +366,12 @@ function Composer() {
         )}
       </div>
 
-      <p className="mt-1.5 font-mono text-micro text-steel-600">
-        Enter to send · Shift+Enter for a newline
-      </p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <ModelPicker />
+        <p className="font-mono text-micro text-steel-600">
+          Enter to send · Shift+Enter for a newline
+        </p>
+      </div>
     </div>
   );
 }

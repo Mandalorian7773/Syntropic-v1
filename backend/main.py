@@ -19,6 +19,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import sys
 import time
 import uuid
@@ -51,7 +52,7 @@ from audit.network import NetworkMonitor, startup_selfcheck
 from db.store import Store
 from llm.client import LLMClient
 from llm.manager import ModelManager, ModelRegistry
-from llm.router import Router
+from llm.router import ModelChoiceError, Router
 from sse import Cancels, stream_events
 from tools.files import ListFilesTool, ReadFileTool, WriteFileTool, safe_path
 from tools.registry import Registry
@@ -164,6 +165,58 @@ def _decide(message: str, attachments: list[Attachment]) -> RouterDecision:
         )
 
 
+# --- user-chosen models -------------------------------------------------------
+#
+# A session stays on the model the user picked. This is held in memory and
+# mirrored into the audit log, which is the only durable store reachable from
+# this file: db/store.py belongs to another slice and has no set_model_id, so
+# adding a `model_id` column is a request in the PR rather than an edit here.
+# The audit log is append-only and already records every routing decision, so
+# "the user pinned this session to model X" is a fact that belongs in it
+# regardless; reading the latest one back is what survives a restart.
+SESSION_MODEL_KIND = "session.model"
+_session_model: dict[str, str] = {}
+
+
+def _pin_session_model(session_id: str, model_id: str) -> None:
+    if _session_model.get(session_id) == model_id:
+        return
+    _session_model[session_id] = model_id
+    audit.record(SESSION_MODEL_KIND, {"model_id": model_id}, session_id)
+
+
+def _session_model_id(session_id: str) -> str | None:
+    """The model a session is pinned to, memory first, audit log second."""
+    if session_id in _session_model:
+        return _session_model[session_id]
+    for row in reversed(audit.trail(session_id)):
+        if row.get("kind") != SESSION_MODEL_KIND:
+            continue
+        try:
+            model_id = json.loads(row["payload_json"]).get("model_id")
+        except (ValueError, KeyError, TypeError):
+            continue
+        if model_id:
+            _session_model[session_id] = model_id
+            return model_id
+    return None
+
+
+def _resolve_model(req: ChatRequest) -> str | None:
+    """The model this turn should run on, or None to let the router decide.
+
+    An explicit `model_id` on the request wins and re-pins the session. With
+    none given, a session already pinned stays pinned -- that is what "a
+    conversation stays on one model" means, and it is the difference between a
+    picker and a per-message toggle.
+    """
+    if req.model_id:
+        return req.model_id
+    if req.session_id:
+        return _session_model_id(req.session_id)
+    return None
+
+
 def _user_content(message: str, attachments: list[Attachment]) -> str | list[dict]:
     """Plain string, unless an image attachment turns it into multimodal parts."""
     images = [a for a in attachments if a.mime.startswith("image/") and a.path]
@@ -183,8 +236,33 @@ def _user_content(message: str, attachments: list[Attachment]) -> str | list[dic
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
+    # Validate a chosen model before anything is written down. A rejected turn
+    # should leave no session, no user message and no audit entry behind: the
+    # request never happened as far as the conversation is concerned.
+    chosen = _resolve_model(req)
+    override: RouterDecision | None = None
+    if chosen is not None:
+        pinned = chosen != req.model_id
+        try:
+            override = router.decide_override(chosen, req.message, req.attachments)
+        except KeyError:
+            known = ", ".join(sorted(m.id for m in manager.registry.models))
+            raise HTTPException(
+                400, f"unknown model_id {chosen!r}. Available models: {known}."
+            ) from None
+        except ModelChoiceError as exc:
+            detail = str(exc)
+            if pinned:
+                detail += (
+                    f" This session is pinned to {chosen!r}; send model_id with "
+                    f"a capable model to move it, or null to let the router choose."
+                )
+            raise HTTPException(400, detail) from None
+
     session_id = req.session_id or str(uuid.uuid4())
     store.ensure_session(session_id, title=req.message)
+    if req.model_id:
+        _pin_session_model(session_id, req.model_id)
     store.add_message(session_id, "user", req.message)
     audit.record("prompt", {
         "message": req.message,
@@ -197,7 +275,9 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         audit.event(start, session_id)
         yield start
 
-        decision = _decide(req.message, req.attachments)
+        # The router still speaks even when it did not choose, so the trace
+        # panel always shows why this turn is on this model.
+        decision = override if override is not None else _decide(req.message, req.attachments)
         audit.event(decision, session_id)
         store.set_task_type(session_id, decision.task_type)
         yield decision
@@ -250,12 +330,63 @@ async def upload(file: UploadFile) -> Attachment:
 
 # These three return BARE ARRAYS, not envelopes -- the contract is explicit
 # about it and frontend/src/api/rest.ts consumes them as ModelInfo[] etc.
+# Presentation for the model picker, derived from the registry.
+#
+# Derived rather than configured because config/models.yaml belongs to another
+# slice and has no display_name or description keys. `getattr` below picks them
+# up the moment it does, so adding them is a YAML edit and not a code change --
+# and that addition is the request in this PR. Until then a name like
+# "qwen2.5-coder-7b" is turned into something a person can compare on a stage.
+_NAME_TOKENS = {"vl": "VL", "moe": "MoE", "llava": "LLaVA", "vlm": "VLM"}
+_SIZE = re.compile(r"^\d+(?:\.\d+)?b$")
+
+# Ordered by how much the capability distinguishes a model. "general" says
+# almost nothing, so it comes last and is only used when nothing else applies.
+_CAPABILITY_BLURB = [
+    ("vision", "reads images and scanned pages"),
+    ("code", "writes and reviews code"),
+    ("document", "answers questions from your documents"),
+    ("data", "works through tables and numbers"),
+    ("general", "general questions and drafting"),
+]
+
+
+def _display_name(spec) -> str:
+    configured = getattr(spec, "display_name", "") or ""
+    if configured:
+        return configured
+    words = []
+    for token in spec.id.split("-"):
+        if _SIZE.match(token.lower()):
+            words.append(token.upper())
+        elif token.lower() in _NAME_TOKENS:
+            words.append(_NAME_TOKENS[token.lower()])
+        else:
+            words.append(token[:1].upper() + token[1:])
+    return " ".join(words)
+
+
+def _description(spec) -> str:
+    configured = getattr(spec, "description", "") or ""
+    if configured:
+        return configured
+    blurbs = [text for cap, text in _CAPABILITY_BLURB if cap in spec.capabilities]
+    if not blurbs:
+        return "No capabilities declared."
+    # Two clauses at most: this is one line under a name in a dropdown, not a
+    # datasheet. The capability chips next to it carry the complete list.
+    picked = blurbs[:2]
+    sentence = " and ".join(picked) if len(picked) == 2 else picked[0]
+    return sentence[:1].upper() + sentence[1:] + "."
+
+
 @app.get("/api/models", response_model=list[ModelInfo])
 async def models() -> list[ModelInfo]:
     return [
         ModelInfo(
             id=m.id, capabilities=m.capabilities, context=m.context,
             vram_mb=m.vram_mb, loaded=(m.id == manager.loaded_id),
+            display_name=_display_name(m), description=_description(m),
         )
         for m in manager.registry.models
     ]
@@ -292,6 +423,8 @@ async def session_detail(session_id: str) -> SessionDetail:
             for row in store.get_steps(session_id)
             if row["ok"] is not None  # skip calls that never returned
         ],
+        # None when the router is choosing per turn, which is the default.
+        model_id=_session_model_id(session_id),
     )
 
 

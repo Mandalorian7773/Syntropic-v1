@@ -21,7 +21,12 @@ export interface StreamHandle {
 }
 
 export function streamChat(
-  body: { session_id?: string | null; message: string },
+  body: {
+    session_id?: string | null;
+    message: string;
+    /** Run this turn on a chosen model. Omit to let the router decide. */
+    model_id?: string | null;
+  },
   onEvent: (ev: Event) => void,
   onFatal: (message: string) => void,
 ): StreamHandle {
@@ -33,9 +38,15 @@ export function streamChat(
       res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Built field by field on purpose, so nothing the caller happens to
+        // be carrying leaks onto the wire. That also means a new field is
+        // silently dropped until it is named here -- which is exactly what
+        // happened to model_id: the type accepted it, the request never
+        // carried it, and the override looked wired while doing nothing.
         body: JSON.stringify({
           session_id: body.session_id ?? null,
           message: body.message,
+          ...(body.model_id ? { model_id: body.model_id } : {}),
         }),
         signal: controller.signal,
       });
@@ -47,7 +58,18 @@ export function streamChat(
     }
 
     if (!res.ok || !res.body) {
-      onFatal(`backend returned ${res.status} ${res.statusText}`);
+      // A refused turn -- an unknown model, or one that cannot do this job --
+      // comes back as 400 with a `detail` that says which and suggests what to
+      // pick instead. Showing "backend returned 400 Bad Request" instead of
+      // that sentence throws away the only useful part of the response.
+      let detail = '';
+      try {
+        const body = (await res.json()) as { detail?: unknown };
+        if (typeof body?.detail === 'string') detail = body.detail;
+      } catch {
+        /* not JSON: fall back to the status line */
+      }
+      onFatal(detail || `backend returned ${res.status} ${res.statusText}`);
       return;
     }
 

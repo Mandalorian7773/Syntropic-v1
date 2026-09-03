@@ -106,18 +106,60 @@ function Step({ step, index }: { step: TraceStep; index: number }) {
         </pre>
       )}
 
-      {step.summary && (
-        <p
-          className={`mt-1 pl-7 font-mono text-tiny leading-relaxed
-                      ${step.ok ? 'text-steel-400' : 'text-fault'}`}
-        >
-          {step.summary}
-          {step.truncated && (
-            <span className="ml-1 text-steel-600">[truncated]</span>
-          )}
-        </p>
-      )}
+      {step.summary && <Summary step={step} />}
     </li>
+  );
+}
+
+/** How much of a tool result to show before it needs asking for. */
+const SUMMARY_PREVIEW_CHARS = 220;
+
+/**
+ * A tool result, clamped until asked for.
+ *
+ * search_documents returns up to a thousand tokens of JSON -- that is its
+ * contract, and it is the right amount to hand a model. Rendered raw it fills
+ * the trace panel and pushes every other step off screen, so the one column
+ * that exists to show what the agent did stops showing it. Collapsed by
+ * default, whole on request, and never silently cut: the preview says how much
+ * more there is.
+ */
+function Summary({ step }: { step: TraceStep }) {
+  const [open, setOpen] = useState(false);
+  const text = step.summary ?? '';
+  const long = text.length > SUMMARY_PREVIEW_CHARS || text.split('\n').length > 4;
+  const shown = open || !long ? text : `${text.slice(0, SUMMARY_PREVIEW_CHARS).trimEnd()}…`;
+
+  return (
+    <div className="mt-1 pl-7">
+      <p
+        className={`whitespace-pre-wrap break-words font-mono text-tiny
+                    leading-relaxed ${step.ok ? 'text-steel-400' : 'text-fault'}
+                    ${open ? 'max-h-64 overflow-auto scroll-thin' : ''}`}
+      >
+        {shown}
+        {step.truncated && !long && (
+          <span className="ml-1 text-steel-600">[truncated]</span>
+        )}
+      </p>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="mt-0.5 font-mono text-micro text-steel-500
+                     hover:text-accent"
+        >
+          {open
+            ? '▾ show less'
+            : `▸ show all ${text.length.toLocaleString()} characters`}
+          {step.truncated && (
+            <span className="ml-1 text-steel-600">
+              (tool output was truncated at the source)
+            </span>
+          )}
+        </button>
+      )}
+    </div>
   );
 }
 
