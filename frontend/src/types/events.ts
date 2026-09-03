@@ -173,6 +173,10 @@ export interface ChatRequest {
   session_id: string | null;
   message: string;
   attachments: Attachment[];
+  /**
+   * Run this turn on a specific model, overriding the router. None means route as before, so an existing client is unaffected.
+   */
+  model_id: string | null;
 }
 export interface CancelRequest {
   session_id: string;
@@ -186,6 +190,14 @@ export interface ModelInfo {
   context: number;
   vram_mb: number;
   loaded: boolean;
+  /**
+   * Human-readable name for the picker.
+   */
+  display_name: string;
+  /**
+   * One line on what this model is good for.
+   */
+  description: string;
 }
 /**
  * One row of GET /api/sessions (bare array of these).
@@ -221,6 +233,10 @@ export interface SessionDetail {
   id: string;
   messages: Message[];
   steps: SessionStep[];
+  /**
+   * The model this session is pinned to, set when a user picked one. None means the router chooses per turn, which is the default.
+   */
+  model_id: string | null;
 }
 /**
  * POST /api/documents/upload (multipart).
