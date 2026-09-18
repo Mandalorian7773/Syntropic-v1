@@ -69,8 +69,8 @@ export function ModelPicker() {
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
         title={current ? `Pinned to ${current.id}` : 'The router picks per message'}
-        className="flex h-7 max-w-[15rem] items-center gap-1.5 border
-                   border-steel-700 bg-steel-850 px-2 font-mono text-tiny
+        className="flex h-7 max-w-[15rem] items-center gap-1.5 rounded-lg border
+                   border-steel-700 bg-steel-850 px-2 text-tiny
                    text-steel-300 hover:border-accent-dim hover:text-accent
                    disabled:opacity-40"
       >
@@ -86,7 +86,7 @@ export function ModelPicker() {
 
       {open && (
         <div
-          className="absolute bottom-9 left-0 z-20 w-[26rem] border
+          className="absolute bottom-9 left-0 z-20 w-[26rem] overflow-hidden rounded-xl border
                      border-steel-700 bg-steel-900 shadow-xl"
           role="listbox"
         >
@@ -113,7 +113,7 @@ export function ModelPicker() {
               onClick={() => { select(m.id); setOpen(false); }}
             />
           ))}
-          <p className="border-t border-steel-850 px-3 py-1.5 font-mono
+          <p className="border-t border-steel-850 px-3 py-1.5 
                         text-micro text-steel-600">
             One model is resident at a time. Switching costs a reload.
           </p>
@@ -144,16 +144,16 @@ function Option({
                   ${active ? 'bg-steel-850' : ''}`}
     >
       <div className="flex items-baseline gap-2">
-        <span className={`font-mono text-tiny ${active ? 'text-accent' : 'text-steel-100'}`}>
+        <span className={`text-tiny ${active ? 'text-accent' : 'text-steel-100'}`}>
           {title}
         </span>
         {loaded && (
-          <span className="border border-iso-dim px-1 font-mono text-micro text-iso">
+          <span className="rounded-md border border-iso-dim px-1 text-micro text-iso">
             resident
           </span>
         )}
         {meta && (
-          <span className="ml-auto shrink-0 font-mono text-micro text-steel-500">
+          <span className="ml-auto shrink-0 text-micro text-steel-500">
             {meta}
           </span>
         )}
@@ -165,7 +165,7 @@ function Option({
         <ul className="mt-1 flex flex-wrap gap-1">
           {capabilities.map((c) => (
             <li key={c}
-                className="border border-steel-700 px-1 font-mono text-micro
+                className="rounded-md border border-steel-700 px-1 text-micro
                            text-steel-500">
               {c}
             </li>
@@ -201,8 +201,8 @@ export function SwapProgress() {
   const pct = Math.min(95, (elapsed / eta) * 95);
 
   return (
-    <div className="border-t border-steel-800 bg-steel-900 px-3 py-2">
-      <div className="flex items-baseline justify-between font-mono text-tiny">
+    <div className="border-t border-steel-800 bg-steel-900/80 px-4 py-2">
+      <div className="flex items-baseline justify-between text-tiny">
         <span className="text-steel-200">
           Loading <span className="text-accent">{swap.modelId}</span>
           {swap.evicting && (
@@ -213,7 +213,7 @@ export function SwapProgress() {
           {elapsed.toFixed(1)}s {overrun ? `· past the ${eta}s estimate` : `/ ~${eta}s`}
         </span>
       </div>
-      <div className="mt-1.5 h-1 w-full bg-steel-850">
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-steel-850">
         <div
           className={`h-full transition-[width] duration-200 ${
             overrun ? 'bg-work' : 'bg-accent'
@@ -221,7 +221,7 @@ export function SwapProgress() {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-1 font-mono text-micro text-steel-600">
+      <p className="mt-1 text-micro text-steel-600">
         One model is resident at a time; the card has room for one.
       </p>
     </div>

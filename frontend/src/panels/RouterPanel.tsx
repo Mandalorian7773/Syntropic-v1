@@ -26,7 +26,7 @@ export default function RouterPanel({ className = '' }: { className?: string }) 
       title="Router"
       right={
         activeModel && !swap ? (
-          <span className="font-mono text-tiny text-iso">{activeModel}</span>
+          <span className="text-tiny text-iso">{activeModel}</span>
         ) : null
       }
       bodyClass="px-3 py-2"
@@ -48,7 +48,7 @@ export default function RouterPanel({ className = '' }: { className?: string }) 
             <span className="text-accent">{router.model_id}</span>
           </Field>
           <Field label="Task">
-            <span className="rounded-sm bg-steel-800 px-1.5 py-0.5 text-steel-100">
+            <span className="rounded-md bg-accent-deep px-2 py-0.5 font-medium text-accent">
               {taskTypeLabel[router.task_type]}
             </span>
           </Field>
@@ -71,7 +71,7 @@ export default function RouterPanel({ className = '' }: { className?: string }) 
                 {router.alternatives.map((alt) => (
                   <li
                     key={alt}
-                    className="border border-steel-700 px-1.5 py-0.5 font-mono
+                    className="rounded-md border border-steel-700 px-1.5 py-0.5 
                                text-tiny text-steel-500 line-through
                                decoration-steel-600"
                   >
@@ -98,21 +98,21 @@ function Confidence({ value }: { value: number }) {
       <div className="flex items-baseline justify-between">
         <span className="label">Confidence</span>
         <span
-          className={`font-mono text-tiny tabular-nums
+          className={`text-tiny tabular-nums
                       ${low ? 'text-work' : 'text-steel-200'}`}
         >
           {value.toFixed(2)}
           <span className="ml-1 text-steel-500">({pct}%)</span>
         </span>
       </div>
-      <div className="mt-1 h-1 w-full bg-steel-800">
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-steel-800">
         <div
           className={`h-full ${low ? 'bg-work' : 'bg-accent'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
       {low && (
-        <p className="mt-1 font-mono text-micro text-work">
+        <p className="mt-1 text-micro text-work">
           below 0.60 threshold — staying on resident model
         </p>
       )}
@@ -142,15 +142,15 @@ function SwapIndicator() {
   const over = elapsed > swap.etaS;
 
   return (
-    <div className="border border-work-dim bg-work-deep/50 p-2">
+    <div className="rounded-xl border border-work-dim bg-work-deep/50 p-3">
       <div className="flex items-center justify-between">
         <span className="label text-work">Model swap in progress</span>
-        <span className="font-mono text-tiny tabular-nums text-work">
+        <span className="text-tiny tabular-nums text-work">
           {elapsed.toFixed(1)}s / ~{swap.etaS}s
         </span>
       </div>
 
-      <div className="mt-2 space-y-1 font-mono text-tiny">
+      <div className="mt-2 space-y-1 text-tiny">
         {swap.evicting && (
           <div className="flex items-center gap-2 text-steel-500">
             <span className="w-14 shrink-0 text-micro uppercase tracking-widest">
@@ -168,7 +168,7 @@ function SwapIndicator() {
         </div>
       </div>
 
-      <div className="mt-2 h-1 w-full bg-steel-800">
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-steel-800">
         <div
           className="h-full bg-work transition-[width] duration-100 ease-linear"
           style={{ width: `${pct}%` }}
@@ -176,13 +176,13 @@ function SwapIndicator() {
       </div>
       {over ? (
         <>
-          <p className="mt-1 font-mono text-micro text-work">
+          <p className="mt-1 text-micro text-work">
             past estimate — still loading, this is normal on an 8 GB card
           </p>
           <div className="mt-1"><Sweep /></div>
         </>
       ) : (
-        <p className="mt-1 font-mono text-micro text-steel-500">
+        <p className="mt-1 text-micro text-steel-500">
           one model resident at a time — 8 GB VRAM budget
         </p>
       )}

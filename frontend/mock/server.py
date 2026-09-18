@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mock backend for the SIH26117 workbench frontend. Owner: person 1.
+"""Mock backend for the Privis frontend. Owner: person 1.
 
 Standard library only, on purpose: this runs on a laptop with no venv, no pip
 and no network. It serves every REST endpoint the SPA consumes and streams four
@@ -527,7 +527,7 @@ CANCELLED: set[str] = set()
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
-    server_version = "sih26117-mock/1.0"
+    server_version = "privis-mock/1.0"
 
     # -- helpers ----------------------------------------------------------
 

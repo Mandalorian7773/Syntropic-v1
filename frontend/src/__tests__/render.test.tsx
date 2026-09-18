@@ -14,7 +14,7 @@ describe('render', () => {
   it('mounts the full three-region layout', () => {
     const html = renderToString(<App />);
     // The rail, the empty-state splash, and each instrument panel heading.
-    expect(html).toContain('26117');
+    expect(html).toContain('Privis');
     expect(html).toContain('Router');
     expect(html).toContain('Agent trace');
     expect(html).toContain('Artifacts');

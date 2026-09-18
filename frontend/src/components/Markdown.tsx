@@ -15,12 +15,12 @@ export default function Markdown({ children }: { children: string }) {
         remarkPlugins={[remarkGfm]}
         components={{
           p: (p) => <p className="my-2 first:mt-0 last:mb-0" {...p} />,
-          h1: (p) => <h1 className="mb-2 mt-4 font-mono text-base font-semibold
+          h1: (p) => <h1 className="mb-2 mt-4 text-base font-semibold
                                     text-steel-100 first:mt-0" {...p} />,
-          h2: (p) => <h2 className="mb-2 mt-4 font-mono text-sm font-semibold
+          h2: (p) => <h2 className="mb-2 mt-4 text-sm font-semibold
                                     uppercase tracking-wide text-steel-100
                                     first:mt-0" {...p} />,
-          h3: (p) => <h3 className="mb-1 mt-3 font-mono text-sm font-semibold
+          h3: (p) => <h3 className="mb-1 mt-3 text-sm font-semibold
                                     text-steel-200 first:mt-0" {...p} />,
           ul: (p) => <ul className="my-2 list-disc space-y-1 pl-5
                                     marker:text-steel-600" {...p} />,
@@ -41,7 +41,7 @@ export default function Markdown({ children }: { children: string }) {
           table: (p) => (
             <div className="my-3 overflow-x-auto scroll-thin border
                             border-steel-800">
-              <table className="w-full border-collapse font-mono text-tiny" {...p} />
+              <table className="w-full border-collapse text-tiny" {...p} />
             </div>
           ),
           thead: (p) => <thead className="bg-steel-850" {...p} />,
@@ -62,7 +62,7 @@ export default function Markdown({ children }: { children: string }) {
               return <CodeBlock code={text} language={match?.[1] ?? null} />;
             }
             return (
-              <code className="rounded-sm bg-steel-800 px-1 py-0.5 font-mono
+              <code className="rounded-md bg-steel-850 px-1 py-0.5 font-mono
                                text-[0.85em] text-accent" {...rest}>
                 {children}
               </code>

@@ -86,14 +86,14 @@ export default function NetworkPanel() {
       <div className="px-3 pb-3 pt-1">
         {/* The number. Everything else on this panel is subordinate to it. */}
         <div
-          className={`text-center font-mono font-bold leading-none tabular-nums
+          className={`text-center font-bold leading-none tabular-nums
                       ${bad ? 'text-fault' : 'text-iso'}`}
           style={{ fontSize: 'clamp(2.75rem, 4.4vw, 4.5rem)' }}
         >
           {total}
         </div>
         <div
-          className={`mt-1 text-center font-mono font-semibold uppercase
+          className={`mt-1 text-center font-semibold uppercase
                       tracking-[0.22em] ${bad ? 'text-fault' : 'text-iso'}`}
           style={{ fontSize: 'clamp(0.7rem, 0.95vw, 1rem)' }}
         >
@@ -101,7 +101,7 @@ export default function NetworkPanel() {
         </div>
 
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t
-                       border-steel-800 pt-2 font-mono text-tiny">
+                       border-steel-800 pt-2 text-tiny">
           <Stat label="Packets" value={status?.external_packets ?? '—'} bad={bad} />
           <Stat label="DNS" value={status?.dns_queries ?? '—'} bad={bad} />
           <Stat label="Uptime" value={status ? duration(elapsed) : '—'} />
@@ -113,13 +113,13 @@ export default function NetworkPanel() {
         </dl>
 
         {bad && (
-          <p className="mt-2 border border-fault-dim bg-fault-deep px-2 py-1
-                        font-mono text-tiny text-fault">
+          <p className="mt-2 rounded-lg border border-fault-dim bg-fault-deep px-2 py-1
+                        text-tiny text-fault">
             Egress detected. This indicator does not reset.
           </p>
         )}
         {!reachable && (
-          <p className="mt-2 font-mono text-tiny text-work">
+          <p className="mt-2 text-tiny text-work">
             /api/network/status unreachable — monitor cannot confirm isolation.
           </p>
         )}
