@@ -19,6 +19,8 @@ import { ModelPicker, SwapProgress } from '../components/ModelPicker';
 import { uploadAttachment, uploadDocument } from '../api/rest';
 import type { Attachment, UploadResponse } from '../types/events';
 import { Dot, ms } from '../components/ui';
+import { ChartIcon, ChatIcon, DocIcon, PlusIcon, SendIcon, ShieldIcon } from '../components/icons';
+import type { ReactNode } from 'react';
 
 /** A file in the composer, from the moment it is picked. */
 interface Pending {
@@ -78,9 +80,9 @@ export default function ChatView() {
         <button
           type="button"
           onClick={toLatest}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 border
-                     border-steel-700 bg-steel-850 px-3 py-1 font-mono text-tiny
-                     text-steel-200 shadow-lg hover:border-accent-dim
+          className="absolute bottom-40 left-1/2 -translate-x-1/2 rounded-full
+                     border border-steel-800 bg-steel-900 px-4 py-1.5 text-tiny
+                     font-medium text-steel-200 shadow-pop hover:border-accent-dim
                      hover:text-accent"
         >
           ↓ jump to latest
@@ -97,38 +99,66 @@ export default function ChatView() {
 
 function Splash() {
   return (
-    <div className="mx-auto max-w-lg pt-10 text-center">
-      <p className="font-mono text-micro uppercase tracking-[0.3em] text-steel-600">
-        Sovereign agentic workbench
-      </p>
-      <p className="mt-3 text-sm text-steel-400">
-        Everything runs on this machine. No request leaves it.
-      </p>
-      <div className="mt-6 grid grid-cols-2 gap-2 text-left">
-        {[
-          ['Document', 'What is the max permissible wall loss in the SOP?'],
-          ['Code', 'Write a python script to total downtime per unit'],
-          ['Failure', 'Scan every page — make this fail with a timeout'],
-          ['Simple', 'Who signs off a hot work permit?'],
-        ].map(([tag, text]) => (
-          <Suggestion key={tag} tag={tag} text={text} />
+    <div className="mx-auto flex max-w-xl flex-col items-center pt-8 text-center">
+      <span className="rounded-md border border-steel-800 bg-steel-850 px-2.5 py-1
+                       text-tiny text-steel-300">
+        Start here
+      </span>
+      <div className="mt-2 w-full rounded-2xl border border-steel-800 bg-steel-900
+                      p-4 text-left shadow-card">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center
+                           rounded-lg bg-brand text-white">
+            <ShieldIcon className="h-[18px] w-[18px]" />
+          </span>
+          <div>
+            <p className="text-base font-medium text-steel-100">
+              Welcome to Privis
+            </p>
+            <p className="text-sm text-steel-500">
+              Everything runs on this machine. No request leaves it.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="h-8 w-px bg-steel-700" aria-hidden />
+      <span className="rounded-md bg-accent-deep px-2.5 py-1 text-tiny
+                       font-medium text-accent">
+        Try one of these
+      </span>
+      <div className="mt-2 grid w-full grid-cols-2 gap-3 text-left">
+        {([
+          ['Document', 'What is the max permissible wall loss in the SOP?', <DocIcon key="d" />],
+          ['Code', 'Write a python script to total downtime per unit', <ChartIcon key="c" />],
+          ['Failure', 'Scan every page — make this fail with a timeout', <ShieldIcon key="f" />],
+          ['Simple', 'Who signs off a hot work permit?', <ChatIcon key="s" />],
+        ] as [string, string, ReactNode][]).map(([tag, text, icon]) => (
+          <Suggestion key={tag} tag={tag} text={text} icon={icon} />
         ))}
       </div>
     </div>
   );
 }
 
-function Suggestion({ tag, text }: { tag: string; text: string }) {
+function Suggestion({ tag, text, icon }: {
+  tag: string; text: string; icon: ReactNode;
+}) {
   const send = useSession((s) => s.send);
   return (
     <button
       type="button"
       onClick={() => send(text)}
-      className="border border-steel-800 bg-steel-900 p-2 text-left
-                 hover:border-accent-dim hover:bg-steel-850"
+      className="flex gap-3 rounded-2xl border border-steel-800 bg-steel-900 p-3
+                 text-left shadow-card transition-colors hover:border-accent-dim"
     >
-      <span className="label">{tag}</span>
-      <p className="mt-1 text-tiny text-steel-300">{text}</p>
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center
+                       rounded-lg bg-accent-deep text-accent">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-steel-100">{tag}</span>
+        <span className="mt-0.5 block text-tiny text-steel-500">{text}</span>
+      </span>
     </button>
   );
 }
@@ -142,8 +172,8 @@ function Bubble({ message }: { message: ChatMessage }) {
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] border border-steel-700 bg-steel-800 px-3
-                        py-2 text-sm text-steel-100">
+        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-accent-deep px-4
+                        py-2.5 text-sm text-steel-100">
           {message.content}
         </div>
       </div>
@@ -152,14 +182,18 @@ function Bubble({ message }: { message: ChatMessage }) {
 
   return (
     <div className="flex gap-3">
-      <div className="w-1 shrink-0 bg-accent-dim" aria-hidden />
-      <div className="min-w-0 flex-1">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center
+                       rounded-lg bg-brand text-white" aria-hidden>
+        <ChatIcon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border
+                      border-steel-800 bg-steel-900 px-4 py-3 shadow-card">
         {message.content ? (
           <Markdown>{message.content}</Markdown>
         ) : streaming ? (
           <Thinking />
         ) : (
-          <p className="font-mono text-tiny text-steel-600">no output</p>
+          <p className="text-tiny text-steel-600">no output</p>
         )}
 
         {streaming && message.content && <Caret />}
@@ -170,7 +204,7 @@ function Bubble({ message }: { message: ChatMessage }) {
 
         {message.stopReason && message.stopReason !== 'final_answer' && (
           <p
-            className={`mt-2 inline-block border px-1.5 py-0.5 font-mono
+            className={`mt-2 inline-block rounded-md border px-1.5 py-0.5 
                         text-micro uppercase tracking-widest ${
               message.stopReason === 'cancelled'
                 ? 'border-steel-600 text-steel-400'
@@ -199,7 +233,7 @@ function Thinking() {
     : 'generating';
 
   return (
-    <p className="flex items-center gap-2 font-mono text-tiny text-steel-400">
+    <p className="flex items-center gap-2 text-tiny text-steel-400">
       <Dot tone="work" />
       {text}
       <span className="animate-pulse-slow text-steel-600">…</span>
@@ -221,11 +255,11 @@ function Citations({ message }: { message: ChatMessage }) {
       <ol className="space-y-1.5">
         {message.citations.map((c, i) => (
           <li key={`${c.doc_id}-${c.page}-${i}`} className="flex gap-2">
-            <span className="shrink-0 font-mono text-tiny text-steel-600">
+            <span className="shrink-0 text-tiny text-steel-600">
               [{i + 1}]
             </span>
             <div className="min-w-0">
-              <p className="font-mono text-tiny text-steel-300">
+              <p className="text-tiny text-steel-300">
                 <span className="text-accent">{c.filename}</span>
                 <span className="text-steel-500"> · p.{c.page}</span>
                 <span className="ml-1.5 text-steel-600 tabular-nums">
@@ -248,7 +282,7 @@ function RunFooter() {
   if (!run) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t
-                    border-steel-850 pt-2 font-mono text-micro uppercase
+                    border-steel-850 pt-2 text-micro uppercase
                     tracking-widest text-steel-600">
       <span>stop: <span className="text-steel-400">
         {run.stopReason.replace('_', ' ')}</span></span>
@@ -356,13 +390,14 @@ function Composer() {
   }
 
   return (
-    <div className="shrink-0 border-t border-steel-800 bg-steel-900 p-3">
+    <div className="m-4 mt-0 shrink-0 rounded-2xl border border-steel-800
+                    bg-steel-900 p-3 shadow-card">
       {pending.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-1.5">
           {pending.map((p) => (
             <li key={p.key}
                 title={p.error ?? (p.doc ? `${p.doc.pages} page(s) indexed` : p.attachment ? 'attached for the vision model' : 'reading…')}
-                className={`flex items-center gap-1.5 border px-2 py-0.5 font-mono
+                className={`flex items-center gap-1.5 rounded-lg border px-2 py-0.5 
                             text-tiny ${
                   p.status === 'failed' ? 'border-fault-dim bg-fault-deep text-fault'
                   : p.status === 'ready' ? 'border-accent-dim bg-steel-850 text-steel-200'
@@ -402,11 +437,12 @@ function Composer() {
           onClick={() => picker.current?.click()}
           disabled={busy}
           title="Attach a file"
-          className="h-9 w-9 shrink-0 border border-steel-700 bg-steel-850
-                     font-mono text-base text-steel-400 hover:border-accent-dim
-                     hover:text-accent disabled:opacity-40"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center
+                     rounded-xl border border-steel-800 bg-steel-850
+                     text-steel-400 hover:border-accent-dim hover:text-accent
+                     disabled:opacity-40"
         >
-          +
+          <PlusIcon />
         </button>
 
         <textarea
@@ -417,19 +453,20 @@ function Composer() {
           onKeyDown={onKeyDown}
           disabled={busy}
           placeholder={busy ? 'streaming…' : 'Ask about a document, or request a script.'}
-          className="min-h-[36px] flex-1 resize-none border border-steel-700
-                     bg-steel-950 px-3 py-2 text-sm text-steel-100
-                     placeholder:text-steel-600 focus:border-accent-dim
-                     focus:outline-none disabled:opacity-60"
+          className="min-h-[40px] flex-1 resize-none rounded-xl border
+                     border-steel-800 bg-steel-850 px-3 py-2.5 text-sm
+                     text-steel-100 placeholder:text-steel-500
+                     focus:border-accent-dim focus:outline-none
+                     disabled:opacity-60"
         />
 
         {busy ? (
           <button
             type="button"
             onClick={stop}
-            className="h-9 shrink-0 border border-fault-dim bg-fault-deep px-4
-                       font-mono text-tiny uppercase tracking-widest text-fault
-                       hover:bg-fault hover:text-steel-950"
+            className="h-10 shrink-0 rounded-xl border border-fault-dim
+                       bg-fault-deep px-4 text-tiny font-semibold text-fault
+                       hover:bg-fault hover:text-white"
           >
             Stop
           </button>
@@ -438,20 +475,16 @@ function Composer() {
             type="button"
             onClick={submit}
             disabled={!text.trim() || uploading !== null}
-            className="h-9 shrink-0 border border-accent-dim bg-accent-deep px-4
-                       font-mono text-tiny uppercase tracking-widest text-accent
-                       hover:bg-accent hover:text-steel-950
-                       disabled:opacity-30 disabled:hover:bg-accent-deep
-                       disabled:hover:text-accent"
+            className="btn-primary h-10"
           >
-            {uploading ? 'Reading…' : 'Send'}
+            {uploading ? 'Reading…' : <>Send <SendIcon className="h-4 w-4" /></>}
           </button>
         )}
       </div>
 
       <div className="mt-1.5 flex items-center gap-2">
         <ModelPicker />
-        <p className="font-mono text-micro text-steel-600">
+        <p className="text-micro text-steel-600">
           {uploading
             ? `reading ${uploading} — OCR runs on CPU, a scanned page takes a few seconds`
             : 'Enter to send · Shift+Enter for a newline · attach a PDF/DOCX/XLSX to ask about it, or an image to have it read'}

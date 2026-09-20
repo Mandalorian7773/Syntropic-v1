@@ -33,7 +33,7 @@ export default function ArtifactsPanel({ className = '' }: { className?: string 
       className={className}
       right={
         artifacts.length > 0 ? (
-          <span className="font-mono text-tiny text-steel-400">
+          <span className="text-tiny text-steel-400">
             {artifacts.length}
           </span>
         ) : null
@@ -49,16 +49,16 @@ export default function ArtifactsPanel({ className = '' }: { className?: string 
               <li key={a.artifact_id} className="flex items-center gap-2.5 px-3 py-2">
                 <span
                   className={`flex h-8 w-9 shrink-0 items-center justify-center
-                              border ${k.tone} font-mono text-micro font-bold`}
+                              rounded-md border ${k.tone} text-micro font-bold`}
                 >
                   {k.tag}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-tiny text-steel-100"
+                  <p className="truncate text-tiny text-steel-100"
                      title={a.filename}>
                     {a.filename}
                   </p>
-                  <p className="font-mono text-micro text-steel-500">
+                  <p className="text-micro text-steel-500">
                     {bytes(a.size_bytes)}
                   </p>
                 </div>
@@ -67,8 +67,8 @@ export default function ArtifactsPanel({ className = '' }: { className?: string 
                 <a
                   href={artifactUrl(a)}
                   download={a.filename}
-                  className="shrink-0 border border-accent-dim bg-accent-deep
-                             px-2 py-1 font-mono text-tiny text-accent
+                  className="shrink-0 rounded-lg border border-accent-dim bg-accent-deep
+                             px-2 py-1 text-tiny text-accent
                              hover:bg-accent hover:text-steel-950"
                 >
                   Download

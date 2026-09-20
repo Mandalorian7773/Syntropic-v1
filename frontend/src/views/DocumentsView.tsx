@@ -63,10 +63,10 @@ export default function DocumentsView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scroll-thin p-6">
       <header className="mb-4 flex items-baseline justify-between">
-        <h1 className="font-mono text-sm uppercase tracking-widest text-steel-100">
+        <h1 className="text-sm uppercase tracking-widest text-steel-100">
           Document corpus
         </h1>
-        <span className="font-mono text-tiny text-steel-500">
+        <span className="text-tiny text-steel-500">
           {docs.length} docs · {totals.pages} pages · {totals.chunks} chunks ·{' '}
           {bytes(totals.size)}
         </span>
@@ -76,19 +76,19 @@ export default function DocumentsView() {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`mb-5 border border-dashed p-6 text-center transition-colors
+        className={`mb-5 rounded-2xl border-2 border-dashed p-6 text-center transition-colors
                     ${dragging
                       ? 'border-accent bg-accent-deep/40'
                       : 'border-steel-700 bg-steel-900/60'}`}
       >
-        <p className="font-mono text-tiny text-steel-300">
+        <p className="text-tiny text-steel-300">
           Drop PDFs, spreadsheets or scans here
         </p>
-        <p className="mt-1 font-mono text-micro text-steel-600">
+        <p className="mt-1 text-micro text-steel-600">
           Ingestion, OCR and indexing all run on this machine
         </p>
-        <label className="mt-3 inline-block cursor-pointer border
-                          border-accent-dim bg-accent-deep px-3 py-1 font-mono
+        <label className="mt-3 inline-block cursor-pointer rounded-lg border
+                          border-accent-dim bg-accent-deep px-3 py-1 
                           text-tiny text-accent hover:bg-accent
                           hover:text-steel-950">
           Choose files
@@ -103,20 +103,20 @@ export default function DocumentsView() {
           />
         </label>
         {uploading.length > 0 && (
-          <p className="mt-2 font-mono text-tiny text-work">
+          <p className="mt-2 text-tiny text-work">
             uploading {uploading.join(', ')}…
           </p>
         )}
       </div>
 
       {error && (
-        <p className="mb-3 border border-fault-dim bg-fault-deep px-3 py-2
-                      font-mono text-tiny text-fault">
+        <p className="mb-3 rounded-lg border border-fault-dim bg-fault-deep px-3 py-2
+                      text-tiny text-fault">
           {error}
         </p>
       )}
 
-      <table className="w-full border-collapse font-mono text-tiny">
+      <table className="w-full border-collapse text-tiny">
         <thead>
           <tr className="border-b border-steel-700">
             {['Document', 'Pages', 'Chunks', 'Size', 'Ingested', 'Status'].map(
@@ -141,7 +141,7 @@ export default function DocumentsView() {
           )}
           {docs.map((d) => (
             <tr key={d.doc_id}
-                className="border-b border-steel-850 hover:bg-steel-900">
+                className="border-b border-steel-850 hover:bg-steel-850">
               <td className="py-1.5 text-steel-200">{d.filename}</td>
               <td className="py-1.5 text-right tabular-nums text-steel-400">
                 {d.pages}

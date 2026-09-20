@@ -55,14 +55,14 @@ export default function CodeBlock({ code, language }: {
   }
 
   return (
-    <div className="group relative my-2 border border-steel-800 bg-steel-950">
+    <div className="group relative my-2 overflow-hidden rounded-xl border border-steel-800 bg-steel-850">
       <div className="flex items-center justify-between border-b border-steel-850
                       bg-steel-900 px-2 py-1">
         <span className="label">{lang ?? 'text'}</span>
         <button
           type="button"
           onClick={copy}
-          className={`font-mono text-micro uppercase tracking-widest
+          className={`text-micro font-medium
                       ${copied ? 'text-iso' : 'text-steel-500 hover:text-accent'}`}
         >
           {copied ? 'copied' : 'copy'}

@@ -35,7 +35,7 @@ export function Field({ label, children, mono = true }: {
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span className="label shrink-0">{label}</span>
       <span className={`min-w-0 truncate text-right text-tiny text-steel-200
-                        ${mono ? 'font-mono' : ''}`}>
+                        ${mono ? '' : ''}`}>
         {children}
       </span>
     </div>
@@ -44,7 +44,7 @@ export function Field({ label, children, mono = true }: {
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <p className="px-3 py-6 text-center font-mono text-tiny text-steel-600">
+    <p className="px-3 py-6 text-center text-tiny text-steel-600">
       {children}
     </p>
   );
@@ -54,8 +54,8 @@ export function Empty({ children }: { children: ReactNode }) {
 export function Sweep({ tone = 'work' }: { tone?: 'work' | 'accent' }) {
   const color = tone === 'work' ? 'bg-work' : 'bg-accent';
   return (
-    <div className="h-0.5 w-full overflow-hidden bg-steel-800">
-      <div className={`h-full w-1/4 ${color} animate-sweep`} />
+    <div className="h-1 w-full overflow-hidden rounded-full bg-steel-800">
+      <div className={`h-full w-1/4 rounded-full ${color} animate-sweep`} />
     </div>
   );
 }

@@ -1,41 +1,50 @@
 /** @type {import('tailwindcss').Config} */
 //
-// Industrial control-panel palette. NOT the Tailwind default -- this is
-// projected next to a dozen default-styled chat boxes.
+// Every colour is a CSS variable (RGB channels) defined twice in index.css:
+// once for the light theme on :root, once for `.dark`. Class names therefore
+// stay the same in both themes and opacity modifiers (bg-iso-deep/40) work.
 //
 // Colour carries meaning and nothing else:
-//   iso    green   verified, isolated, ok        -- the sovereignty claim
+//   iso    green   verified, isolated, ok
 //   work   amber   in progress, loading, waiting
 //   fault  red     failed, timed out, breached
-//   accent cyan    interactive / selected / the one accent colour
-// Everything else is `steel`, a cool graphite ramp.
+//   accent green   interactive / selected / the one accent colour
+//   brand  green   solid primary buttons (white text on it in both themes)
+// Everything else is `steel`, a neutral ramp: 950 is the page, 900 a card,
+// 800 a border, 100 the strongest text. The ramp flips between themes.
 //
-// Typography is two SYSTEM stacks, no webfonts: a font file would be one more
+// Typography is SYSTEM stacks, no webfonts: a font file would be one more
 // asset to vendor, and a missing one is a demo-day surprise for no benefit.
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+const ramp = (name, keys) =>
+  Object.fromEntries(keys.map((k) => [k, v(`${name}-${k}`)]));
+
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        steel: {
-          950: '#0a0d10', 900: '#0f1418', 850: '#141a20', 800: '#1a2229',
-          750: '#212b34', 700: '#2a3540', 600: '#3d4b58', 500: '#5a6b7a',
-          400: '#8095a5', 300: '#a8bac7', 200: '#cbd7e0', 100: '#e6edf2',
-        },
-        iso:    { DEFAULT: '#2ee59d', dim: '#1a9c6b', deep: '#0d3d2a' },
-        work:   { DEFAULT: '#f2b134', dim: '#b8821f', deep: '#3d2f0d' },
-        fault:  { DEFAULT: '#ff5c5c', dim: '#c03636', deep: '#3d1414' },
-        accent: { DEFAULT: '#38bdf8', dim: '#1d7fa8', deep: '#0c2f3d' },
+        steel: ramp('steel', [950, 900, 850, 800, 750, 700, 600, 500, 400, 300, 200, 100]),
+        iso:    { DEFAULT: v('iso'), dim: v('iso-dim'), deep: v('iso-deep') },
+        work:   { DEFAULT: v('work'), dim: v('work-dim'), deep: v('work-deep') },
+        fault:  { DEFAULT: v('fault'), dim: v('fault-dim'), deep: v('fault-deep') },
+        accent: { DEFAULT: v('accent'), dim: v('accent-dim'), deep: v('accent-deep') },
+        brand:  { DEFAULT: v('brand'), hover: v('brand-hover') },
       },
       fontFamily: {
         mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'JetBrains Mono',
                'Menlo', 'Consolas', 'monospace'],
-        sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto',
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto',
                'Helvetica Neue', 'sans-serif'],
       },
       fontSize: {
-        micro: ['10px', { lineHeight: '14px', letterSpacing: '0.08em' }],
-        tiny: ['11px', { lineHeight: '16px' }],
+        micro: ['11px', { lineHeight: '15px', letterSpacing: '0.02em' }],
+        tiny: ['12.5px', { lineHeight: '18px' }],
+      },
+      boxShadow: {
+        card: '0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -6px rgb(0 0 0 / 0.08)',
+        pop: '0 8px 30px -8px rgb(0 0 0 / 0.18)',
       },
       animation: {
         // Loading states only -- the brief rules out decorative motion.
