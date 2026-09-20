@@ -50,6 +50,19 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Marks a panel whose contents are the idle sample rather than a live reading.
+ * Small, but never absent: these panels are read as instruments.
+ */
+export function SampleTag() {
+  return (
+    <span className="rounded-md border border-steel-700 px-1.5 py-0.5
+                     text-micro uppercase tracking-widest text-steel-500">
+      sample
+    </span>
+  );
+}
+
 /** Indeterminate progress: a bar that sweeps. Used only for waiting states. */
 export function Sweep({ tone = 'work' }: { tone?: 'work' | 'accent' }) {
   const color = tone === 'work' ? 'bg-work' : 'bg-accent';

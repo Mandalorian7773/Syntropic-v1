@@ -12,22 +12,33 @@
  */
 import { useEffect, useState } from 'react';
 import { useSession, taskTypeLabel } from '../store/session';
-import { Empty, Field, Panel, Sweep } from '../components/ui';
+import { Field, Panel, SampleTag, Sweep } from '../components/ui';
+import { demoActiveModel, demoRouter, demoVramMb } from '../demo';
 
 export default function RouterPanel({ className = '' }: { className?: string }) {
-  const router = useSession((s) => s.router);
+  const liveRouter = useSession((s) => s.router);
   const swap = useSession((s) => s.swap);
-  const activeModel = useSession((s) => s.activeModel);
-  const vram = useSession((s) => s.modelVramMb);
+  const liveModel = useSession((s) => s.activeModel);
+  const liveVram = useSession((s) => s.modelVramMb);
   const phase = useSession((s) => s.phase);
+  const untouched = useSession((s) => s.messages.length === 0);
+
+  // Only on an untouched tab: once a turn has been sent the panels are
+  // reporting on a real run, and a sample creeping back into a run that
+  // happened to decide nothing would be a lie about the machine's state.
+  const sample = !liveRouter && !swap && phase === 'idle' && untouched;
+  const router = liveRouter ?? (sample ? demoRouter : null);
+  const activeModel = liveModel ?? (sample ? demoActiveModel : null);
+  const vram = liveVram ?? (sample ? demoVramMb : null);
 
   return (
     <Panel
       title="Router"
       right={
-        activeModel && !swap ? (
-          <span className="text-tiny text-iso">{activeModel}</span>
-        ) : null
+        sample ? <SampleTag />
+          : activeModel && !swap ? (
+            <span className="text-tiny text-iso">{activeModel}</span>
+          ) : null
       }
       bodyClass="px-3 py-2"
       className={className}
@@ -35,15 +46,13 @@ export default function RouterPanel({ className = '' }: { className?: string }) 
       {swap && <SwapIndicator />}
 
       {!router && !swap && (
-        <Empty>
-          {phase === 'idle'
-            ? 'No routing decision yet.'
-            : 'Classifying task…'}
-        </Empty>
+        <p className="px-3 py-6 text-center text-tiny text-steel-600">
+          Classifying task…
+        </p>
       )}
 
       {router && (
-        <div className={swap ? 'mt-3 opacity-50' : ''}>
+        <div className={`${swap ? 'mt-3 opacity-50' : ''} ${sample ? 'opacity-70' : ''}`}>
           <Field label="Model">
             <span className="text-accent">{router.model_id}</span>
           </Field>

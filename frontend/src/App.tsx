@@ -7,8 +7,7 @@
  *   rail (64) | header over [chat + composer (flex) | instruments (22rem)]
  *
  * The instrument column is ordered by how often a judge looks at it: router
- * (demo #1), then the live trace, then artifacts, with the network monitor
- * pinned to the bottom where it never moves and never scrolls away (demo #5).
+ * (demo #1), then the live trace, then artifacts.
  */
 import { useState } from 'react';
 import SessionsRail from './panels/SessionsRail';
@@ -19,7 +18,6 @@ import { BulbIcon, MoonIcon, ShieldIcon, SunIcon } from './components/icons';
 import RouterPanel from './panels/RouterPanel';
 import TracePanel from './panels/TracePanel';
 import ArtifactsPanel from './panels/ArtifactsPanel';
-import NetworkPanel from './panels/NetworkPanel';
 import ChatView from './views/ChatView';
 import DocumentsView from './views/DocumentsView';
 import BenchmarkView from './views/BenchmarkView';
@@ -43,14 +41,13 @@ export default function App() {
           </main>
 
           {/* Instrument column. Always mounted, even on the documents and
-              benchmark views: the network monitor must never leave the screen. */}
+              benchmark views. */}
           <aside className="flex w-[22rem] shrink-0 flex-col gap-3 overflow-hidden">
             <RouterPanel className="shrink-0" />
-            {/* flex-1: the trace takes the slack so the network monitor
-                is pinned to the bottom edge rather than floating. */}
+            {/* flex-1: the trace takes the slack the network monitor used to
+                occupy, so artifacts stay pinned to the bottom edge. */}
             <TracePanel className="flex-1" />
             <ArtifactsPanel className="max-h-64 shrink-0" />
-            <NetworkPanel />
           </aside>
         </div>
       </div>
