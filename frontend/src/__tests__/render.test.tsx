@@ -18,9 +18,11 @@ describe('render', () => {
     expect(html).toContain('Router');
     expect(html).toContain('Agent trace');
     expect(html).toContain('Artifacts');
-    expect(html).toContain('Network isolation');
-    // The sovereignty counter is present and reads zero before any poll.
-    expect(html).toContain('External calls');
+    // Idle and untouched, the instrument panels render the sample fixture
+    // rather than three empty boxes -- and say so.
+    expect(html).toContain('sample');
+    expect(html).toContain('search_documents');
+    expect(html).toContain('wall-loss-summary.docx');
   });
 
   it('renders markdown tables and highlights fenced code', () => {

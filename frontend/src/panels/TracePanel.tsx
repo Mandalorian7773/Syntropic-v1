@@ -12,31 +12,46 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../store/session';
 import type { TraceStep } from '../store/session';
-import { Empty, Panel, ms } from '../components/ui';
+import { Panel, SampleTag, ms } from '../components/ui';
+import { demoMaxSteps, demoStep, demoTrace } from '../demo';
 
 export default function TracePanel({ className = '' }: { className?: string }) {
-  const trace = useSession((s) => s.trace);
-  const step = useSession((s) => s.step);
-  const maxSteps = useSession((s) => s.maxSteps);
+  const liveTrace = useSession((s) => s.trace);
+  const liveStep = useSession((s) => s.step);
+  const liveMax = useSession((s) => s.maxSteps);
+  const phase = useSession((s) => s.phase);
+  const untouched = useSession((s) => s.messages.length === 0);
   const errors = useSession((s) => s.errors);
+
+  // Same rule as the router: untouched tab only. A completed run with zero
+  // steps must read as zero steps, not as the sample.
+  const sample = liveTrace.length === 0 && phase === 'idle' && untouched;
+  const trace = sample ? demoTrace : liveTrace;
+  const step = sample ? demoStep : liveStep;
+  const maxSteps = sample ? demoMaxSteps : liveMax;
 
   return (
     <Panel
       title="Agent trace"
       className={className}
       right={
-        maxSteps > 0 ? (
-          <span className="text-tiny tabular-nums text-steel-400">
-            step <span className="text-steel-100">{step}</span>
-            <span className="text-steel-600"> / {maxSteps}</span>
-          </span>
-        ) : null
+        <span className="flex items-center gap-2">
+          {maxSteps > 0 && (
+            <span className="text-tiny tabular-nums text-steel-400">
+              step <span className="text-steel-100">{step}</span>
+              <span className="text-steel-600"> / {maxSteps}</span>
+            </span>
+          )}
+          {sample && <SampleTag />}
+        </span>
       }
     >
       {trace.length === 0 ? (
-        <Empty>No steps yet.</Empty>
+        <p className="px-3 py-6 text-center text-tiny text-steel-600">
+          No steps yet.
+        </p>
       ) : (
-        <ol className="divide-y divide-steel-850">
+        <ol className={`divide-y divide-steel-850 ${sample ? 'opacity-70' : ''}`}>
           {trace.map((t, i) => (
             <Step key={`${t.step}-${t.callId ?? i}`} step={t} index={i} />
           ))}

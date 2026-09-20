@@ -7,7 +7,8 @@
  */
 import { useSession } from '../store/session';
 import { artifactUrl } from '../api/rest';
-import { Empty, Panel, bytes } from '../components/ui';
+import { Panel, SampleTag, bytes } from '../components/ui';
+import { demoArtifacts } from '../demo';
 
 /** Extension -> short tag. A tag beats an icon font we would have to vendor. */
 function kind(filename: string, mime: string): { tag: string; tone: string } {
@@ -25,24 +26,35 @@ function kind(filename: string, mime: string): { tag: string; tone: string } {
 }
 
 export default function ArtifactsPanel({ className = '' }: { className?: string }) {
-  const artifacts = useSession((s) => s.artifacts);
+  const live = useSession((s) => s.artifacts);
+  const phase = useSession((s) => s.phase);
+  const untouched = useSession((s) => s.messages.length === 0);
+
+  // Untouched tab only -- a run that produced no files must say so.
+  const sample = live.length === 0 && phase === 'idle' && untouched;
+  const artifacts = sample ? demoArtifacts : live;
 
   return (
     <Panel
       title="Artifacts"
       className={className}
       right={
-        artifacts.length > 0 ? (
-          <span className="text-tiny text-steel-400">
-            {artifacts.length}
-          </span>
-        ) : null
+        <span className="flex items-center gap-2">
+          {artifacts.length > 0 && (
+            <span className="text-tiny text-steel-400">
+              {artifacts.length}
+            </span>
+          )}
+          {sample && <SampleTag />}
+        </span>
       }
     >
       {artifacts.length === 0 ? (
-        <Empty>No files produced yet.</Empty>
+        <p className="px-3 py-6 text-center text-tiny text-steel-600">
+          No files produced yet.
+        </p>
       ) : (
-        <ul className="divide-y divide-steel-850">
+        <ul className={`divide-y divide-steel-850 ${sample ? 'opacity-70' : ''}`}>
           {artifacts.map((a) => {
             const k = kind(a.filename, a.mime);
             return (
@@ -63,16 +75,28 @@ export default function ArtifactsPanel({ className = '' }: { className?: string 
                   </p>
                 </div>
                 {/* Plain anchor with `download`: no JS, works with any backend
-                    that sets Content-Disposition, and cannot fail silently. */}
-                <a
-                  href={artifactUrl(a)}
-                  download={a.filename}
-                  className="shrink-0 rounded-lg border border-accent-dim bg-accent-deep
-                             px-2 py-1 text-tiny text-accent
-                             hover:bg-accent hover:text-steel-950"
-                >
-                  Download
-                </a>
+                    that sets Content-Disposition, and cannot fail silently.
+                    The sample rows have no file behind them, so they get a
+                    dead-looking button rather than a dead link. */}
+                {sample ? (
+                  <span
+                    className="shrink-0 cursor-not-allowed rounded-lg border
+                               border-steel-700 px-2 py-1 text-tiny text-steel-600"
+                    title="Sample row — no file behind it"
+                  >
+                    Download
+                  </span>
+                ) : (
+                  <a
+                    href={artifactUrl(a)}
+                    download={a.filename}
+                    className="shrink-0 rounded-lg border border-accent-dim bg-accent-deep
+                               px-2 py-1 text-tiny text-accent
+                               hover:bg-accent hover:text-steel-950"
+                  >
+                    Download
+                  </a>
+                )}
               </li>
             );
           })}
